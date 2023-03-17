@@ -3,7 +3,7 @@
 
 
 #include <ctre/Phoenix.h> /* Requires Phoenix along with this vendordep */
-#include <BaseMotor.hpp>
+#include "BaseMotor.hpp"
 
 /**
  @author Tyler Clarke and Luke White
@@ -63,7 +63,7 @@ public:
     }
 
     double GetPosition() {
-        return talon -> GetSeletedSensorPosition();
+        return talon -> GetSelectedSensorPosition();
     }
     
     double GetVelocity() {
@@ -99,6 +99,10 @@ public:
     }
 
     double GetCurrent() {
-        return 0;
+        return talon -> GetOutputCurrent();
+    }
+
+    void ConfigIdleToBrake() {
+        
     }
 };

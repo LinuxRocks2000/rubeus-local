@@ -2,7 +2,7 @@
 
 
 #include <ctre/Phoenix.h> /* Requires Phoenix along with this vendordep */
-#include <BaseMotor.hpp>
+#include "BaseMotor.hpp"
 
 /**
  @author Tyler Clarke and Luke White
@@ -28,17 +28,17 @@ public:
         delete talon;
     }
     
-    bool _setInverted(bool invert) {
+    void _setInverted(bool invert) {
         talon -> SetInverted(invert);
     }
     
     void SetPercent(double speed){
-        if (speed < 0) {
+        /*if (speed < 0) {
             talon -> SetInverted(!invert);
         }
         else {
             talon -> SetInverted(invert);
-        }
+        }*/
         
         talon -> Set(ControlMode::PercentOutput, speed);
     }
@@ -67,24 +67,10 @@ public:
     }
 
     void SetPositionPID(double position){
-        if (position < 0) {
-            talon -> SetInverted(!invert);
-        }
-        else {
-            talon -> SetInverted(invert);
-        }
-        
         talon -> Set(ControlMode::Position, position);
     }
 
-    void SetSpeedPID(double speed){
-        if (speed < 0) {
-            talon -> SetInverted(!invert);
-        }
-        else {
-            talon -> SetInverted(invert);
-        }
-        
+    void SetSpeedPID(double speed){        
         talon -> Set(ControlMode::Velocity, speed);
     }
     
@@ -98,5 +84,9 @@ public:
 
     double GetCurrent() {
         return 0;
+    }
+
+    void ConfigIdleToBrake() {
+        talon -> SetNeutralMode(NeutralMode::Brake);
     }
 };

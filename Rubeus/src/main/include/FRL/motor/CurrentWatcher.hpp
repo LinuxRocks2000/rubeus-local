@@ -11,7 +11,7 @@ class CurrentWatcher {
     bool wasEndangered; // If, at the last cycle, it was spiking
 
 public:
-    bool isEndangered = true;
+    bool isEndangered = false;
 
     CurrentWatcher(BaseMotor* bm, double dangerCurrent, double dangerCurrentSecs, double cooldown = 1){
         watchee = bm;

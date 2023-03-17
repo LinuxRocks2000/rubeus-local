@@ -1,27 +1,27 @@
 #pragma once
 
-#include <frc/GenericHID.h>
 #include <frc/XboxController.h>
-#include <frc/Joystick.h>
 
 enum Buttons {
-    ELBOW_CONTROL = 1,
-    ARM_BARF  = 5,
-    ARM_INTAKE = 3,
-    INTAKE_MACRO = 4,
-    ARM_PICKUP = 5,
-    ZERO_NAVX = 6,
-    SHOULDER_CONTROL = 7, 
-    TOGGLE_OPTION_1 = 8,
-    TOGGLE_OPTION_3 = 9,
-    STOP_MACROS = 10,
-    KEY = 11,
-    ZERO = 12
+    ELBOW_CONTROL,
+    ARM_BARF,
+    ARM_INTAKE,
+    SQUARE_UP,
+    ARM_PICKUP,
+    ZERO_NAVX,
+    SHOULDER_CONTROL, 
+    TOGGLE_OPTION_1,
+    TOGGLE_OPTION_3,
+    STOP_ARM,
+    KEY,
+    ZERO,
+    ZOOM_ZOOM,
+    ARM_SHOOT
 };
 
 
 enum Axis {
-    TRIM = 1,
+    ARM_TRIM = 1,
     SPEED_LIMIT = 2
 };
 
@@ -59,16 +59,19 @@ public:
     }
 
     void update() {
+        usedAxis[SPEED_LIMIT] = 0.3;
         if (xbox.IsConnected()) {            
             usedCoords[LEFT_X] = xbox.GetRawAxis(0);
             usedCoords[LEFT_Y] = xbox.GetRawAxis(1);
-            usedCoords[RIGHT_X] = xbox.GetRawAxis(3);
-            usedCoords[RIGHT_Y] = xbox.GetRawAxis(4);
-            usedButtonStates[ARM_BARF] = xbox.GetRawButton(2);
-            usedButtonStates[ARM_INTAKE] = xbox.GetRawButton(1);
+            usedCoords[RIGHT_X] = xbox.GetRawAxis(4);
+            usedCoords[RIGHT_Y] = xbox.GetRawAxis(5);
             usedButtonStates[ZERO_NAVX] = xbox.GetRawButton(3);
             usedButtonStates[ELBOW_CONTROL] = xbox.GetRawButton(5);
-            usedButtonStates[SHOULDER_CONTROL] = xbox.GetRawButton(6);
+            //usedButtonStates[SHOULDER_CONTROL] = xbox.GetRawButton(6);
+            usedButtonStates[ARM_INTAKE] = false;
+            usedButtonStates[SQUARE_UP] = xbox.GetRawButton(4);
+            usedButtonStates[ZOOM_ZOOM] = xbox.GetRawButton(6);
+            usedButtonStates[ARM_SHOOT] = xbox.GetRawButton(8);
         }
         if (joy.IsConnected()) {
             usedCoords[LEFT_X] = joy.GetRawAxis(0);
@@ -89,7 +92,16 @@ public:
             usedButtonStates[TOGGLE_OPTION_3] = buttonboard.GetRawButton(6);
             usedButtonStates[ARM_PICKUP] = buttonboard.GetRawButton(3);
             usedButtonStates[ZERO] = buttonboard.GetRawButton(13);
+            usedAxis[ARM_TRIM] = buttonboard.GetRawAxis(2);
+            usedButtonStates[STOP_ARM] = buttonboard.GetRawButton(8);
+            usedButtonStates[SQUARE_UP] = buttonboard.GetRawButton(12);
+            usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(4);
+            usedButtonStates[ARM_INTAKE] = buttonboard.GetRawButton(5);
         }
+    }
+
+    double GetTrim(){
+        return usedAxis[ARM_TRIM];
     }
 
     bool GetButton(Buttons button) {

@@ -99,8 +99,8 @@ public:
         speed -> SetInverted(speedInverted);
         direction -> SetInverted(direcInverted);
 
-        //speed -> ConfigIdleToBrake();
-        //direction -> ConfigIdleToBrake();
+        speed -> ConfigIdleToBrake();
+        direction -> ConfigIdleToBrake();
     }
 
     void SetLockTime(float lT, bool followLink = true){
@@ -138,20 +138,18 @@ public:
       @param reference The reference point (defaulted to zero)
      */
 
-    bool withinDeadband(double num, double dead, double reference = 0, bool followLink = false) {
+    bool withinDeadband(double num, double dead, double reference = 0) {
         num -= reference; // So reference becomes 0
-        if (isLinked && followLink) {
-            return linkSwerve -> withinDeadband(num, dead, reference, followLink);
-        }
+        
         return (num < dead) &&
                (num > -dead);
     }
 
     bool allAtLocation(double loc) {
         if (isLinked) {
-            return withinDeadband(GetDirection(), 20, loc, true);
+            return linkSwerve -> withinDeadband(linkSwerve -> GetDirection(), 30, loc) && withinDeadband(GetDirection(), 30, loc);
         }
-        return withinDeadband(GetDirection(), 20, loc, false);
+        return withinDeadband(GetDirection(), 30, loc);
     }
 
     /**
@@ -411,7 +409,29 @@ public:
         return totes/cnt;
     }
 
-    //bool orientTo(double target, double curr) {
-        
-    //}
+    double lastLinkPosition = 0;
+
+    vector GetDenormalizedVector(){
+        vector ret;
+        double pos = speed -> GetPosition();
+        double speed = pos - lastLinkPosition;
+        lastLinkPosition = pos;
+        ret.setMandA(speed, GetDirection() * PI/2048);
+        return ret;
+    }
+
+    vector GetEstimatedDisplacement(){
+        vector ret;
+        int cnt = 1;
+        SwerveModule* link = this;
+        while (link -> isLinked){
+            ret += link -> GetDenormalizedVector();
+            cnt ++;
+            link = link -> linkSwerve;
+        }
+        ret += link -> GetDenormalizedVector();
+        ret.x /= cnt;
+        ret.y /= cnt;
+        return ret;
+    }
 };

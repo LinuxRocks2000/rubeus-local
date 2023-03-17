@@ -5,6 +5,7 @@
 #include <frc/DoubleSolenoid.h>
 #include <frc/Compressor.h>
 #include <FRL/motor/CurrentWatcher.hpp>
+#include "controls.hpp"
 
 const double shoulderBarLengthCM = 91.44; // Length of the forearm in centimeters
 const double elbowBarLengthCM = 91.44; // What can I call it? Anti-forearm? Arm? Elbow-y bit? Yeah. Elbow-y bit. This is the elbow-y bit length in centimeters.
@@ -16,7 +17,8 @@ const double elbowDefaultAngle = 280; // Reflect the angle of the shoulder about
 enum GrabMode {
     OFF,
     INTAKE,
-    BARF
+    BARF,
+    SHOOT
 };
 
 
@@ -25,8 +27,9 @@ struct ArmPosition {
     float y;
 };
 
-const vector lowPole { 130, 76.36 };
-const vector highPole { 130, 106.84 };
+const vector lowPole { 110, 76.36 };
+const vector highPole { 110, 106.84 };
+const vector shootHigh { 110, 110 };
 const vector home { 35, 0 };
 
 struct ArmInfo {
@@ -106,6 +109,9 @@ public:
     long elbowDefaultEncoderTicks = 0;
     long shoulderDefaultEncoderTicks = 0;
 
+    double trim = 0;
+    bool disabled = false;
+    bool doneBarfing = false;
     bool handState = false;
     BaseMotor* shoulder;
     BaseMotor* elbow;
@@ -121,33 +127,36 @@ public:
     bool sweeping = false;
     frc::DigitalInput elbowLimitSwitch { elbowLimitswitchID };
     frc::DigitalInput shoulderLimitSwitch { shoulderLimitswitchID };
+    frc::AnalogInput elbowEncoder { elbowID };
+    frc::AnalogInput shoulderEncoder { shoulderID };
+    frc::DigitalInput boop { boopID };
+    vector curPos;
 
     Arm(BaseMotor* s, BaseMotor* e, BaseMotor* h){
         shoulder = s;
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.005;
-        //elbowController -> constants.D = 0.0045;
-        elbowController -> constants.MinOutput = -0.25;
-        elbowController -> constants.MaxOutput = 0.25;
+        elbowController -> constants.P = 0.002;
+        elbowController -> constants.I = 0;
+        //elbowController -> constants.D = 0.05;
+        //elbowController -> constants.F = -0.05;
+        elbowController -> constants.MinOutput = -0.2;
+        elbowController -> constants.MaxOutput = 0.3;
         shoulderController = new PIDController(s);
-        shoulderController -> constants.P = 0.0025;
+        shoulderController -> constants.P = 0.007;
         shoulderController -> constants.I = 0;
-        //shoulderController -> constants.D = 0.0045;
-        shoulderController -> constants.MinOutput = -0.15;
-        shoulderController -> constants.MaxOutput = 0.15;
+        shoulderController -> constants.D = 0.04;
+        //shoulderController -> constants.F = 0.15;
+        shoulderController -> constants.MinOutput = -0.3;
+        shoulderController -> constants.MaxOutput = 0.3;
         elbowController -> SetCircumference(4096);
         shoulderController -> SetCircumference(4096);
         shoulder -> ConfigIdleToBrake();
         elbow -> ConfigIdleToBrake();
-        shoulderWatcher = new CurrentWatcher { shoulder, 35, 2 };
-        elbowWatcher = new CurrentWatcher { elbow, 3, 2 };
+        shoulderWatcher = new CurrentWatcher { shoulder, 60, 0.25 };
+        elbowWatcher = new CurrentWatcher { elbow, 35, 0.25 };
     }
-
-    frc::AnalogInput elbowEncoder { elbowID };
-    frc::AnalogInput shoulderEncoder { shoulderID };
-    frc::DigitalInput boop { boopID };
 
     void test(){
         //goalX += 0.002;
@@ -157,14 +166,16 @@ public:
         frc::SmartDashboard::PutNumber("Shoulder real", shoulderEncoder.GetValue());
         frc::SmartDashboard::PutNumber("Shoulder nice", GetShoulderPos());
         frc::SmartDashboard::PutNumber("Elbow real", elbowEncoder.GetValue());
+        frc::SmartDashboard::PutNumber("Elbow normal", GetNormalizedElbow());
         frc::SmartDashboard::PutNumber("Elbow nice", GetElbowPos());
-        ArmPosition p = GetArmPosition();
+        vector p = GetArmPosition();
         frc::SmartDashboard::PutNumber("Head X", p.x);
         frc::SmartDashboard::PutNumber("Head Y", p.y);
         frc::SmartDashboard::PutNumber("Shoulder Current", shoulder -> GetCurrent());
         frc::SmartDashboard::PutNumber("Elbow Current", elbow -> GetCurrent());
         frc::SmartDashboard::PutBoolean("Elbow Danger", !elbowWatcher -> isEndangered);
         frc::SmartDashboard::PutBoolean("Shoulder Danger", !shoulderWatcher -> isEndangered);
+        frc::SmartDashboard::PutBoolean("Hand switch", boop.Get());
         //armGoToPos(lowPole);
         //frc::SmartDashboard::PutNumber("Shoulder goal", GetShoulderGoalFrom(goal));
         //frc::SmartDashboard::PutNumber("Elbow goal", GetElbowGoalFrom(goal));
@@ -175,11 +186,11 @@ public:
     GrabMode grabMode;
     
     void goToHome(bool triggerSol = false) {
-        armGoToPos({35, 0});
+        armGoToPos({30, 0});
     }
 
     void goToPickup() {
-        armGoToPos({100, 0});
+        armGoToPos({65, -15});
     }
 
     void goToLowPole() {
@@ -191,26 +202,29 @@ public:
     }
 
     bool checkSwitches() {
-        frc::SmartDashboard::PutBoolean("elbow switch", !elbowLimitSwitch.Get()); // elbow is Normally Open because c'est messed up
+        frc::SmartDashboard::PutBoolean("elbow switch", elbowLimitSwitch.Get()); // elbow is Normally Open because c'est messed up
         frc::SmartDashboard::PutBoolean("shoulder switch", shoulderLimitSwitch.Get()); // shoulder is, as proper, Normally Closed
-        bool zero = true;
-        if (shoulderLimitSwitch.Get()){
+        if (shoulderLimitSwitch.Get() && elbowLimitSwitch.Get()){
             shoulderDefaultEncoderTicks = shoulderEncoder.GetValue();
-        }
-        else {
-            zero = false;
-        }
-        if (!elbowLimitSwitch.Get()){
             elbowDefaultEncoderTicks = elbowEncoder.GetValue();
+            return true;
         }
-        else {
-            zero = false;
-        }
-        return zero;
+        return false;
     }
 
     void armGoToPos(vector pos) {
         goalPos = pos;
+        if ((curPos.x < 65) && (curPos.x > 30)){
+            if (curPos.y < 0){
+                if (std::abs(curPos.x - 35) < std::abs(curPos.x - 60)){ // if it's closer to 35 than 60
+                    goalPos.x = 35;
+                }
+                else{
+                    goalPos.x = 60;
+                }
+            }
+            goalPos.y += 5;
+        }
     }
 
     int GetNormalizedShoulder(){
@@ -240,8 +254,8 @@ public:
         return GetElbowPos() * PI/180;
     }
 
-    ArmPosition GetArmPosition(){
-        ArmPosition ret;
+    vector GetArmPosition(){
+        vector ret;
         double shoulderRads = GetShoulderRadians();
         double elbowRads = GetElbowRadians();
         double elbowX = cos(elbowRads) * elbowBarLengthCM;
@@ -289,52 +303,158 @@ public:
     double sAng, eAng;
 
     bool atGoal(){
-        return (std::abs(shoulderEncoder.GetValue() - sAng) < 15) && (std::abs(elbowEncoder.GetValue() - eAng) < 15);
+        return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
     }
 
     bool zeroed = false;
 
+    vector lastPos;
+
     void Update(){
+        if (!disabled) {
+            if (grabMode == INTAKE){
+                if (!boop.Get()){
+                    hand -> SetPercent(0);
+                }
+                else {
+                    hand -> SetPercent(-0.3);
+                }
+            }
+            else if (grabMode == BARF){
+                hand -> SetPercent(0.2);
+            }
+            else if (grabMode == SHOOT){
+                hand -> SetPercent(1);
+            }
+            else {
+                hand -> SetPercent(0);
+            }
+        }
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
-        if (!zeroed){
-            AuxSetPercent(0.2, 0.1);
+        /*if (!zeroed){
+            //std::cout << "is zero" << std::endl;
+            AuxSetPercent(0.4, 0.1);
             zeroed = checkSwitches();
             return;
-        }
-        if (retract){
+        }*/
+        
+        /*if (retract){
             goToHome();
             if (atGoal()){
                 retract = false;
             }
-        }
+        }*/
+        //std::cout << std::endl;
         checkSwitches();
         if (elbowWatcher -> isEndangered || shoulderWatcher -> isEndangered){
+            //std::cout << "is endangered" << std::endl;
             AuxSetPercent(0, 0);
             return;
         }
-        ArmPosition pos = GetArmPosition();
+
+        vector pos = GetArmPosition();
+        curPos = pos;
         info.goal = goalPos;
+        lastPos = pos;
         info.curHeadX = pos.x;
         info.curHeadY = pos.y;
         info.Update();
+        double useN = info.n;
+        double useOmega = info.omega;
         //info.RestrictOutputs(shoulderDefaultAngle, 0, 360, elbowDefaultAngle);
-        if (pos.x > 25 && pos.x < 55) { // Shoulder has to go up if it's finna clear the bumper
-            info.n = 80;
-        }
-        sAng = ShoulderAngleToEncoderTicks(info.n);
-        eAng = ElbowAngleToEncoderTicks(info.omega, info.n);
+        sAng = ShoulderAngleToEncoderTicks(useN);
+        eAng = ElbowAngleToEncoderTicks(useOmega, info.n) + trim;
         shoulderController -> SetPosition(sAng);
         elbowController -> SetPosition(eAng);
         frc::SmartDashboard::PutNumber("Shoulder goal", sAng);
         frc::SmartDashboard::PutNumber("Elbow goal", eAng);
-        frc::SmartDashboard::PutNumber("Head Goal X", goalPos.x);
-        frc::SmartDashboard::PutNumber("Head Goal Y", goalPos.y);
+        frc::SmartDashboard::PutNumber("Head Goal X", info.goal.x);
+        frc::SmartDashboard::PutNumber("Head Goal Y", info.goal.y);
 
-        shoulderController -> Update(shoulderEncoder.GetValue());
-        elbowController -> Update(elbowEncoder.GetValue());
-
+        frc::SmartDashboard::PutNumber("Shouldah", shoulderController -> Update(shoulderEncoder.GetValue()));
+        if (!disabled) {
+            elbowController -> Update(elbowEncoder.GetValue());
+            shoulderController -> Update(shoulderEncoder.GetValue());
+        }
+        else {
+            AuxSetPercent(0, 0);
+        }
         grabMode = OFF; // ain't sticky - don't want breakies
+    }
+
+    void ShimZero(){
+        zeroed = false;
+    }
+
+    void Shim(double s){
+        if (!zeroed){
+            AuxSetPercent(0, 0.1);
+            zeroed = checkSwitches();
+            return;
+        }
+        shoulderWatcher -> Update();
+        elbowWatcher -> Update();
+        if (elbowWatcher -> isEndangered || shoulderWatcher -> isEndangered){
+            AuxSetPercent(0, 0);
+            return;
+        }
+        double goal = smartLoop(elbowDefaultEncoderTicks + s);
+        frc::SmartDashboard::PutNumber("Goal", goal);
+        frc::SmartDashboard::PutNumber("Default", elbowDefaultEncoderTicks);
+        elbowController -> SetPosition(goal);
+        if (!disabled) {
+            elbowController -> Update(elbowEncoder.GetValue());
+        }
+        else {
+            AuxSetPercent(0, 0);
+        }
+    }
+
+    void SetShimTrim(double t) {
+        trim = t;
+    }
+
+    void SetDisabled(bool state) {
+        disabled = state;
+    }
+
+    void ShimPickup(){
+        Shim(-900 - trim);
+    }
+
+    void ShimPlaceLow(){
+        Shim(-315 - trim);
+    }
+
+    void ShimPlaceHigh(){
+        Shim(-830 - trim);
+    }
+
+    double ShimGet() {
+        return GetNormalizedElbow();
+    }
+
+    void ShimHand(){
+        /*if (!disabled) {
+            if (grabMode == INTAKE){
+                hand -> SetPercent(0.2);
+            }
+            else if (grabMode == BARF){
+                hand -> SetPercent(-0.1);
+            }
+            else {
+                hand -> SetPercent(0);
+            }
+        }
+        grabMode = OFF; // ain't sticky - don't want breakies*/
+    }
+
+    void ShimHome() {
+        //ShimZero();//Shim(0); // unlike the other shim(0) calls this one should stay as shim(0)
+        if (!elbowAtLimit()){
+            AuxSetPercent(0, 0.1);
+        }
     }
 
     bool Has(){
@@ -350,20 +470,21 @@ public:
     }
 
     bool elbowAtLimit(){
-        return !elbowLimitSwitch.Get() || elbowWatcher -> isEndangered;
+        return elbowLimitSwitch.Get() || elbowWatcher -> isEndangered;
     }
 
     void Zero(){
+        //std::cout << "zero" << std::endl;
         zeroed = false;
     }
 
     void AuxSetPercent(double s, double e){
-        shoulderWatcher -> Update();
-        elbowWatcher -> Update();
-        if ((shoulderAtLimit() && (s > 0)) || shoulderWatcher -> isEndangered){
+        //shoulderWatcher -> Update();
+        //elbowWatcher -> Update();
+        if ((shoulderLimitSwitch.Get() && (s > 0)) || shoulderWatcher -> isEndangered){
             s = 0;
         }
-        if ((elbowAtLimit() && (e > 0)) || elbowWatcher -> isEndangered){
+        if ((elbowLimitSwitch.Get() && (e > 0)) || elbowWatcher -> isEndangered){
             e = 0;
         }
         shoulder -> SetPercent(s);

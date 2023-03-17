@@ -52,12 +52,12 @@ struct Object {
 	}
 	
 	Object(const Object& o){
-		this -> type = o.type;
-		this -> string = o.string;
-		this -> number = o.number;
-		this -> boolean = o.boolean;
-		this -> extFun = o.extFun;
-		this -> fun = o.fun;
+		type = o.type;
+		string = o.string;
+		number = o.number;
+		boolean = o.boolean;
+		extFun = o.extFun;
+		fun = o.fun;
 	}
 	
 	Object(std::string s){
@@ -120,6 +120,16 @@ struct Object {
 		extFun = fun;
 	}
 	
+    Object& operator=(const Object& o){
+		type = o.type;
+		string = o.string;
+		number = o.number;
+		boolean = o.boolean;
+		extFun = o.extFun;
+		fun = o.fun;
+        return *this;
+    }
+
 	std::string toString(){
 		if (type == BOOLEAN){
 			return (std::string)"Bool " + (boolean ? "true" : "false") + " " + name;
@@ -404,14 +414,14 @@ public:
 		std::cout << "============= Stack end ============" << std::endl;
 	}
 	
-	Object& PopStack(){ // todo: refcounting? idk
+	Object& PopStack(){
 		Object& ret = PeekStack();
 		stack.erase(stack.end() - shift);
 		return ret;
 	}
 	
 	Object& PeekStack() {
-		assert(stack.size() - 1 - shift >= 0);
+		assert((long)stack.size() - 1 - shift >= 0);
 		return stack[stack.size() - 1 - shift];
 	}
 	
@@ -423,7 +433,7 @@ public:
 		stack.insert(stack.end() - shift, thing);
 	}
 	
-	size_t shift = 0;
+	long shift = 0;
 	
 	void ShiftStack() { // Mask the current item in the stack by increasing the "window" by one
 		shift ++;
