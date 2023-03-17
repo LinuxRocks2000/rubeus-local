@@ -457,16 +457,15 @@ public:
 	}
 
 	void Start(){
-        macros = test1;
+        macros = autoMacro;
         zeroNavx(); // Was 0ing to 180, but this done did caused some code problems.
         onRamp = false;
-        resetBarf();
+        //resetBarf();
         //arm.SetDisabled(false);
         mainSwerve.SetLockTime(30);
         arm.zeroed = false;
-		//zeroNavx();
-        compressor.EnableDigital();
-        arm.checkSwitches();
+        //compressor.EnableDigital();
+        //arm.checkSwitches();
         //mainSwerve.SetLockTime(1); // Time before the swerve drive locks, in seconds
 	}
 
@@ -491,7 +490,7 @@ public:
 		mainSwerve.SetToVector(translation, rotation);*/
 		mainSwerve.ApplySpeed();
         arm.Update();
-        arm.test();
+        //arm.test();
         //arm.ShimHand();
 	}
 };

@@ -332,12 +332,12 @@ public:
         }
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
-        /*if (!zeroed){
+        if (!zeroed){
             //std::cout << "is zero" << std::endl;
             AuxSetPercent(0.4, 0.1);
             zeroed = checkSwitches();
             return;
-        }*/
+        }
         
         /*if (retract){
             goToHome();
