@@ -128,8 +128,9 @@ vector squareUp(double offset = 0) {
         if (withinDeadband(navxHeading(), 1, offset)) {
             squared = true;
         }
-        return control;
+        return rot;
     }
+    return rot;
 }
 
 struct MacroOp {
