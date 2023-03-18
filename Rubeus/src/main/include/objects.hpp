@@ -33,6 +33,17 @@ SwerveModule backRightSwerve (
 	-1024 + BACK_RIGHT_OFFSET
 );
 
+class AngrySparkMotor : public SparkMotor {
+public:
+    AngrySparkMotor(int id) : SparkMotor(id){
+
+    }
+    void SetPercent(double percent){
+        std::cout << "=========\n\nYOUR SPARK JUST RAN AT " << percent << " PERCENT! BAD BAD BAD BAD BAD!!!!!!\n\n=========" << std::endl;
+        assert(percent == 0);
+    }
+};
+
 Arm <1, 0, 5, 1, 3> arm {
 	new TalonSRXMotor(ARM_SHOULDER),
 	new SparkMotor(ARM_ELBOW),

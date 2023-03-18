@@ -39,7 +39,7 @@ double navxOffset = 0;
 bool squared = true;
 
 long navxHeading(){
-	return navx.GetFusedHeading() - navxOffset;
+	return smartLoop(navx.GetFusedHeading() - navxOffset, 360);
 }
 
 long navxHeadingToEncoderTicks(){
@@ -73,15 +73,23 @@ void autoRamp() {
     }
 }
 
-bool driveTo(vector goal, vector rotation = {}){
+bool driveTo(vector goal){
     vector pos = odometry.Update(navxHeading());
     frc::SmartDashboard::PutNumber("Odometric X", pos.x);
     frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
-    vector translation = { pos.x - goal.x, goal.y - pos.y };
+    vector translation = { goal.x - pos.x, pos.y - goal.y };
+    vector rotation;
+    PIDController<vector> rotController {&rotation};
+    rotController.SetCircumference(360);
+    rotController.constants.MinOutput = -.23;
+    rotController.constants.MaxOutput = .23; 
+    rotController.constants.P = .012;
+    rotController.SetPosition(0);
     //translation.setMagnitude(translation.magnitude() * 2); // Make the falloff steeper, because this is p term only
     translation.speedLimit(0.2);
     //translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
-    mainSwerve.SetToVector(translation, { 0, 0 });
+    rotController.Update(navxHeading());
+    mainSwerve.SetToVector(translation, rotation);
     return translation.magnitude() < 0.04;
 }
 
@@ -93,7 +101,8 @@ enum MacroMode {
     BARF_TYPE,
     SHIM_TYPE,
     SHOOT_TYPE,
-    ORIENT_TYPE
+    ORIENT_TYPE,
+    PICKUP_TYPE
 };
 
 double stopBarf;
@@ -105,21 +114,21 @@ void resetBarf() {
 vector rot;
 PIDController<vector> control {&rot};
 
-void squareUp() {
+vector squareUp(double offset = 0) {
     rot.setAngle(PI/4);
     frc::SmartDashboard::PutBoolean("Square", squared);
     control.SetCircumference(360);
-    control.constants.MinOutput = -.35;
-    control.constants.MaxOutput = .35; 
-    control.constants.P = -.01;
+    control.constants.MinOutput = -.23;
+    control.constants.MaxOutput = .23; 
+    control.constants.P = -.012;
     
     if (!squared) {
-        control.SetPosition(navxOffset);
-        control.Update(navx.GetFusedHeading());
-        mainSwerve.SetToVector({0, 0}, rot);
-        if (withinDeadband(navx.GetFusedHeading(), 4, navxOffset)) {
+        control.SetPosition(offset);
+        control.Update(navxHeading());
+        if (withinDeadband(navxHeading(), 1, offset)) {
             squared = true;
         }
+        return control;
     }
 }
 
@@ -134,15 +143,11 @@ class MacroController {
     size_t sP;
     double shootStartTime = -1;
 	vector rotation;
-	PIDController <vector> autoRotationController { &rotation };
+    PIDController <vector> autoRotationController { &rotation };
+    double target = 0;
 public:
     MacroController() {
-		autoRotationController.SetCircumference(360);
-		autoRotationController.constants.MinOutput = -0.1;
-		autoRotationController.constants.MaxOutput = 0.1;
-		autoRotationController.constants.P = 0.002;
-        autoRotationController.SetPosition(0);
-        rotation.setAngle(PI/4);
+
     } 
     void operator=(MacroOp m[]){
         mnm = m;
@@ -153,7 +158,6 @@ public:
         if (mnm == 0){
             return;
         }
-        autoRotationController.Update(navxHeading());
         MacroOp thing = mnm[sP];
         switch (thing.type) {
             case TERMINATOR:
@@ -166,8 +170,8 @@ public:
                 //std::cout << "called" << std::endl;
                 onRamp = false;
                 arm.armGoToPos(thing.pos);
-                if (arm.atGoal()) {
-                    resetBarf();
+                if (arm.atGoal(thing.pos)) {
+                    
                     std::cout << "arm reached" << std::endl;
                     sP ++;
                 }
@@ -175,9 +179,8 @@ public:
                 break;
             case DRIVE_TYPE:
                 onRamp = false;
-                if (driveTo(thing.pos, rotation)) {
+                if (driveTo(thing.pos)) {
                     sP ++;
-                    resetBarf();
                     mainSwerve.SetToVector({0, 0}, {0, 0});
                 }
                 break;
@@ -190,7 +193,6 @@ public:
                 if (withinDeadband(-arm.ShimGet(), 40, thing.shim)){//arm.ShimGet() < -810) {
                     std::cout << "Shim done" << std::endl;
                     sP ++;
-                    resetBarf();
                 }
                 break;
             case SHOOT_TYPE:
@@ -198,7 +200,7 @@ public:
                 if (shootStartTime == -1){
                     shootStartTime = (double)frc::Timer::GetFPGATimestamp();
                 }
-                if ((double)frc::Timer::GetFPGATimestamp() > shootStartTime + 1){
+                if ((double)frc::Timer::GetFPGATimestamp() > shootStartTime + 0.25){
                     shootStartTime = -1;
                     sP ++;
                 }
@@ -214,10 +216,20 @@ public:
                 }
                 break;
             case ORIENT_TYPE:
-                autoRotationController.SetPosition(thing.shim);
-                mainSwerve.SetToVector({}, rotation);
-                std::cout << "Rotation: " << rotation.magnitude() << std::endl;
-                if (std::abs(navxHeading() - thing.shim) < 3){
+                squared = false;
+                squareUp(thing.shim);
+                if (squared) {
+                    sP ++;
+                } 
+                //std::cout << "Rotation: " << rotation.magnitude() << std::endl;
+                break;
+            case PICKUP_TYPE:
+                arm.armGoToPos({70, -10});
+                if (arm.atY(-10)){
+                    arm.armGoToPos({100, -10});
+                }
+                arm.SetGrab(INTAKE);
+                if (arm.atGoal({100, -10})) {
                     sP ++;
                 }
                 break;
@@ -228,7 +240,7 @@ public:
 frc::GenericHID buttonboard {5};
 class TeleopMode : public RobotMode {
 public:
-	ArmPosition p { 120, 120 };
+	ArmPosition p { 120, 120 }; //no
 
 	vector goal { 2, 0 };
 
@@ -261,12 +273,6 @@ public:
         frc::SmartDashboard::PutNumber("Odometric X", pos.x);
         frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
 		frc::SmartDashboard::PutNumber("Odometry Quality", odometry.Quality());
-        /*if (owner != 0){
-            if (!owner -> Execute()){
-                owner = 0;
-            }
-            return; // lock control of the robot into a macro
-        }*/
 		vector translation {controls.LeftX(), controls.LeftY()};
 		vector rotation;
 		rotation.setMandA(controls.RightX(), PI/4);
@@ -277,10 +283,10 @@ public:
         }
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
-        if (controls.GetButtonReleased(SQUARE_UP)) {
+        if (controls.GetButton(SQUARE_UP)) {
             squared = false;
         }
-		rotation.dead(0.1);
+		rotation.dead(0.15);
 		translation.dead(0.12);
 
 		rotation.speedLimit(limit);
@@ -324,7 +330,6 @@ public:
             arm.Zero();
             //arm.ShimZero();
         }
-
         arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
 		if (controls.GetButton(ELBOW_CONTROL)){
             arm.AuxSetPercent(0, controls.LeftY());
@@ -332,11 +337,13 @@ public:
         else if (controls.GetButton(SHOULDER_CONTROL)) {
             arm.AuxSetPercent(controls.LeftY(), 0);
         }
-        else if (!squared) {
-            squareUp();
-        }
         else{
-            mainSwerve.SetToVector(translation, rotation.flip());
+            if (!squared) {
+                mainSwerve.SetToVector(translation, squareUp());
+            }
+            else {
+                mainSwerve.SetToVector(translation, rotation.flip());
+            }
             //arm.AuxSetPercent(0, 0);
             arm.Update();
             //arm.checkSwitches();
@@ -346,7 +353,9 @@ public:
             if (controls.GetButton(ARM_PICKUP)) {
                 //arm.ShimPickup();
                 //arm.goToPickup();
-                arm.armPickup();
+                //arm.armGoToPos({60, -12});
+                //arm.armPickup();
+                arm.armGoToPos({60, -16});
                 arm.SetGrab(INTAKE);
             }
             else if (controls.GetOption() == 1) {
@@ -374,8 +383,25 @@ public:
 
 MacroOp test1[] {
     {
+        ORIENT_TYPE,
+        {},
+        180
+    },
+    {
+        PICKUP_TYPE
+    },
+    {
         ARM_TYPE,
-        highPole
+        home
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        0
+    },
+    {
+        ARM_TYPE,
+        shootHigh
     },
     {
         SHOOT_TYPE
@@ -383,6 +409,14 @@ MacroOp test1[] {
     {
         ARM_TYPE,
         home
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        180
+    },
+    {
+        TERMINATOR
     }
 };
 
@@ -406,7 +440,7 @@ MacroOp autoMacro[] {
     {
         ORIENT_TYPE,
         {},
-        180
+        90
     },
     {
         ORIENT_TYPE,
@@ -457,7 +491,7 @@ public:
 	}
 
 	void Start(){
-        macros = autoMacro;
+        macros = test1;
         zeroNavx(); // Was 0ing to 180, but this done did caused some code problems.
         onRamp = false;
         //resetBarf();
@@ -472,6 +506,7 @@ public:
     //vector goal;
 
 	void Synchronous(){
+        frc::SmartDashboard::PutNumber("Navx heading", navxHeading());
         //std::cout << "not" << std::endl;
         //arm.zeroed = true;
         //mainSwerve.SetDirection(90 * (4096/360));
@@ -490,8 +525,9 @@ public:
 		mainSwerve.SetToVector(translation, rotation);*/
 		mainSwerve.ApplySpeed();
         arm.Update();
-        //arm.test();
+        arm.test();
         //arm.ShimHand();
+        arm.SetShimTrim(0);
 	}
 };
 
@@ -508,7 +544,7 @@ class DisabledMode : public RobotMode {
 
 #ifndef RUNNING_FRC_TESTS // I'm afraid to remove this.
 int main() {
-    frc::CameraServer::StartAutomaticCapture();
+    //frc::CameraServer::StartAutomaticCapture();
     compressor.Disable();
 	mainSwerve.Link(&backRightSwerve); // Weird, right? This can in fact be used here.
 	backRightSwerve.Link(&frontRightSwerve);

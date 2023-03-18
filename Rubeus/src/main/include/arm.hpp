@@ -6,6 +6,7 @@
 #include <frc/Compressor.h>
 #include <FRL/motor/CurrentWatcher.hpp>
 #include "controls.hpp"
+#include <FRL/util/functions.hpp>
 
 const double shoulderBarLengthCM = 91.44; // Length of the forearm in centimeters
 const double elbowBarLengthCM = 91.44; // What can I call it? Anti-forearm? Arm? Elbow-y bit? Yeah. Elbow-y bit. This is the elbow-y bit length in centimeters.
@@ -29,7 +30,7 @@ struct ArmPosition {
 
 const vector lowPole { 110, 76.36 };
 const vector highPole { 110, 106.84 };
-const vector shootHigh { 110, 110 };
+const vector shootHigh { 110, 115 };
 const vector home { 35, 0 };
 
 struct ArmInfo {
@@ -214,16 +215,16 @@ public:
 
     void armGoToPos(vector pos) {
         goalPos = pos;
-        if ((curPos.x < 65) && (curPos.x > 30)){
+        if ((curPos.x < 60) && (curPos.x > 30)){
             if (curPos.y < 0){
                 if (std::abs(curPos.x - 35) < std::abs(curPos.x - 60)){ // if it's closer to 35 than 60
                     goalPos.x = 35;
                 }
                 else{
-                    goalPos.x = 60;
+                    goalPos.x = 55;
                 }
             }
-            goalPos.y += 5;
+            goalPos.y = 5;
         }
     }
 
@@ -302,8 +303,15 @@ public:
 
     double sAng, eAng;
 
-    bool atGoal(){
-        return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
+    bool atGoal(vector goal){
+        vector current = GetArmPosition();
+        return withinDeadband(current.x, 5, goal.x) && withinDeadband(current.y, 7, goal.y);
+        //return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
+    }
+
+    bool atY(double val) {
+        double curr = GetArmPosition().y;
+        return withinDeadband(curr, 7, val);
     }
 
     bool zeroed = false;
@@ -371,6 +379,8 @@ public:
         frc::SmartDashboard::PutNumber("Elbow goal", eAng);
         frc::SmartDashboard::PutNumber("Head Goal X", info.goal.x);
         frc::SmartDashboard::PutNumber("Head Goal Y", info.goal.y);
+        frc::SmartDashboard::PutNumber("Current x", GetArmPosition().x);
+        frc::SmartDashboard::PutNumber("Current y", GetArmPosition().y);
 
         frc::SmartDashboard::PutNumber("Shouldah", shoulderController -> Update(shoulderEncoder.GetValue()));
         if (!disabled) {
@@ -479,8 +489,8 @@ public:
     }
 
     void AuxSetPercent(double s, double e){
-        //shoulderWatcher -> Update();
-        //elbowWatcher -> Update();
+        shoulderWatcher -> Update();
+        elbowWatcher -> Update();
         if ((shoulderLimitSwitch.Get() && (s > 0)) || shoulderWatcher -> isEndangered){
             s = 0;
         }

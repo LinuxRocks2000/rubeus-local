@@ -16,7 +16,8 @@ enum Buttons {
     KEY,
     ZERO,
     ZOOM_ZOOM,
-    ARM_SHOOT
+    ARM_SHOOT,
+    PICKUP_MACRO
 };
 
 
@@ -94,9 +95,10 @@ public:
             usedButtonStates[ZERO] = buttonboard.GetRawButton(13);
             usedAxis[ARM_TRIM] = buttonboard.GetRawAxis(2);
             usedButtonStates[STOP_ARM] = buttonboard.GetRawButton(8);
-            usedButtonStates[SQUARE_UP] = buttonboard.GetRawButton(12);
+            usedButtonStates[SQUARE_UP] |= buttonboard.GetRawButton(9);
             usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(4);
             usedButtonStates[ARM_INTAKE] = buttonboard.GetRawButton(5);
+            usedButtonStates[PICKUP_MACRO] = buttonboard.GetRawButton(12);
         }
     }
 
