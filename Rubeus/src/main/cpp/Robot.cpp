@@ -73,7 +73,7 @@ void autoRamp() {
     }
 }
 
-bool driveTo(vector goal){
+bool driveTo(vector goal, bool goToZero = true){
     vector pos = odometry.Update(navxHeading());
     frc::SmartDashboard::PutNumber("Odometric X", pos.x);
     frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
@@ -89,7 +89,12 @@ bool driveTo(vector goal){
     translation.speedLimit(0.2);
     //translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
     rotController.Update(navxHeading());
-    mainSwerve.SetToVector(translation, rotation);
+    if (goToZero) {
+        mainSwerve.SetToVector(translation, rotation);
+    }
+    else {
+        mainSwerve.SetToVector(translation, {});
+    }
     return translation.magnitude() < 0.04;
 }
 
@@ -180,7 +185,7 @@ public:
                 break;
             case DRIVE_TYPE:
                 onRamp = false;
-                if (driveTo(thing.pos)) {
+                if (driveTo(thing.pos, false)) {
                     sP ++;
                     mainSwerve.SetToVector({0, 0}, {0, 0});
                 }
@@ -382,27 +387,12 @@ public:
 	}
 };
 
-MacroOp test1[] {
-    {
-        ORIENT_TYPE,
-        {},
-        180
-    },
-    {
-        PICKUP_TYPE
-    },
+/* 27-point auto (if it works) */
+
+MacroOp test[] {
     {
         ARM_TYPE,
-        home
-    },
-    {
-        ORIENT_TYPE,
-        {},
-        0
-    },
-    {
-        ARM_TYPE,
-        shootHigh
+        highPole
     },
     {
         SHOOT_TYPE
@@ -412,9 +402,64 @@ MacroOp test1[] {
         home
     },
     {
+        DRIVE_TYPE,
+        {5, 5}
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp test1[] {
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,           //place high,
+        home
+    },
+    {
+        DRIVE_TYPE,
+        {0, 0}
+    },
+    {
         ORIENT_TYPE,
         {},
-        180
+        90
+    },
+    {
+        PICKUP_TYPE            // pickup cube,
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        0
+    },
+    {
+        DRIVE_TYPE,
+        {0, 0}
+    },
+    {
+        DRIVE_TYPE,
+        {0, 0}
+    },
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,
+        home
+    },
+    {
+        RAMP_TYPE
     },
     {
         TERMINATOR
@@ -492,8 +537,8 @@ public:
 	}
 
 	void Start(){
-        macros = test1;
-        zeroNavx(); // Was 0ing to 180, but this done did caused some code problems.
+        macros = test;
+        zeroNavx(180);
         onRamp = false;
         //resetBarf();
         //arm.SetDisabled(false);
@@ -530,6 +575,10 @@ public:
         //arm.ShimHand();
         arm.SetShimTrim(0);
 	}
+
+    void End() {
+        zeroNavx(180);
+    }
 };
 
 
@@ -541,7 +590,6 @@ class TestMode : public RobotMode {
 class DisabledMode : public RobotMode {
 
 };
-
 
 #ifndef RUNNING_FRC_TESTS // I'm afraid to remove this.
 int main() {
