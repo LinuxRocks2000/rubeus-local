@@ -155,6 +155,7 @@ public:
         shoulderController -> SetCircumference(4096);
         shoulder -> ConfigIdleToBrake();
         elbow -> ConfigIdleToBrake();
+        hand -> ConfigIdleToBrake();
         shoulderWatcher = new CurrentWatcher { shoulder, 60, 0.25 };
         elbowWatcher = new CurrentWatcher { elbow, 35, 0.25 };
     }
@@ -323,6 +324,8 @@ public:
     vector lastPos;
 
     void Update(){
+        shoulderController -> highSwitch = shoulderLimitSwitch.Get();
+        elbowController -> lowSwitch = elbowLimitSwitch.Get();
         if (!disabled) {
             if (grabMode == INTAKE){
                 if (!boop.Get()){

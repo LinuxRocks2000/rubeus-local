@@ -183,6 +183,8 @@ class PIDController {
     }
 
 public:
+    bool lowSwitch = false;
+    bool highSwitch = false;
     /**
      * Constants for PID.
      */
@@ -245,6 +247,12 @@ public:
         }
         else if (ret < constants.MinOutput){
             ret = constants.MinOutput;
+        }
+        if ((ret < 0) && lowSwitch){
+            ret = 0;
+        }
+        else if ((ret > 0) && highSwitch){
+            ret = 0;
         }
         motor -> SetPercent(ret);
         lastTime = (double)frc::Timer::GetFPGATimestamp();
