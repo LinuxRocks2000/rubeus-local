@@ -325,7 +325,7 @@ public:
 
     void Update(){
         shoulderController -> highSwitch = shoulderLimitSwitch.Get();
-        elbowController -> lowSwitch = elbowLimitSwitch.Get();
+        elbowController -> highSwitch = elbowLimitSwitch.Get();
         if (!disabled) {
             if (grabMode == INTAKE){
                 if (!boop.Get()){
