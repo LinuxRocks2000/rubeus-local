@@ -17,7 +17,8 @@ enum Buttons {
     ZERO,
     ZOOM_ZOOM,
     ARM_SHOOT,
-    PICKUP_MACRO
+    PICKUP_MACRO,
+    HIGH_POLE
 };
 
 
@@ -99,6 +100,7 @@ public:
             usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(4);
             usedButtonStates[ARM_INTAKE] = buttonboard.GetRawButton(5);
             usedButtonStates[PICKUP_MACRO] = buttonboard.GetRawButton(12);
+            usedButtonStates[HIGH_POLE] = buttonboard.GetRawButton(11);
         }
     }
 

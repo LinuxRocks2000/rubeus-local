@@ -73,11 +73,25 @@ void autoRamp() {
     }
 }
 
-bool driveTo(vector goal, bool goToZero = true){
+bool driveTo(vector goal, bool goToZero = true, bool invertX = false, bool invertY = false){
     vector pos = odometry.Update(navxHeading());
     frc::SmartDashboard::PutNumber("Odometric X", pos.x);
     frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
-    vector translation = { goal.x - pos.x, pos.y - goal.y };
+    double goX;
+    double goY;
+    if (invertX) {
+        goX = pos.x - goal.x;
+    }
+    else {
+        goX = goal.x - pos.x;
+    }
+    if (invertY) {
+        goY = pos.y - goal.y;
+    }
+    else {
+        goY = goal.y - pos.y;
+    }
+    vector translation = { goX, goY };
     vector rotation;
     PIDController<vector> rotController {&rotation};
     rotController.SetCircumference(360);
@@ -121,7 +135,6 @@ PIDController<vector> control {&rot};
 
 vector squareUp(double offset = 0) {
     rot.setAngle(PI/4);
-    frc::SmartDashboard::PutBoolean("Square", squared);
     control.SetCircumference(360);
     control.constants.MinOutput = -.23;
     control.constants.MaxOutput = .23; 
@@ -289,9 +302,7 @@ public:
         }
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
-        if (controls.GetButton(SQUARE_UP)) {
-            squared = false;
-        }
+        squared = !controls.GetButton(SQUARE_UP);
 		rotation.dead(0.15);
 		translation.dead(0.12);
 
@@ -363,6 +374,9 @@ public:
                 //arm.armPickup();
                 arm.armGoToPos({60, -16});
                 arm.SetGrab(INTAKE);
+            }
+            else if (controls.GetButton(HIGH_POLE)) {
+                arm.goToHighCone();
             }
             else if (controls.GetOption() == 1) {
                 arm.goToHighPole();
@@ -536,7 +550,7 @@ public:
 
 	}
 
-	void Start(){
+	void Start() {
         macros = test;
         zeroNavx(180);
         onRamp = false;

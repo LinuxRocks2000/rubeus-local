@@ -194,12 +194,16 @@ public:
         armGoToPos({65, -15});
     }
 
-    void goToLowPole() {
+    void goToLowPole(bool high = false) {
         armGoToPos({lowPole});
     }
 
     void goToHighPole() {
         armGoToPos({highPole});
+    }
+
+    void goToHighCone() {
+        armGoToPos({125, 120});
     }
 
     bool checkSwitches() {
