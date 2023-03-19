@@ -317,7 +317,7 @@ public:
 
         if (!controls.GetButtonToggled(STOP_ARM)){
             if (controls.GetButton(ARM_INTAKE)){
-                arm.armGoToPos({ 110, 90 });
+                arm.armGoToPos({ 113, 85 });
                 arm.SetGrab(INTAKE);
             }
             else if (controls.GetButton(ARM_BARF)){
@@ -348,6 +348,7 @@ public:
             //arm.ShimZero();
         }
         arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
+        arm.SetShimTrim(controls.GetTrim() * 100);
 		if (controls.GetButton(ELBOW_CONTROL)){
             arm.AuxSetPercent(0, controls.LeftY());
         }
@@ -374,6 +375,7 @@ public:
                 //arm.armPickup();
                 arm.armGoToPos({60, -16});
                 arm.SetGrab(INTAKE);
+                arm.SetShimTrim(0);
             }
             else if (controls.GetButton(HIGH_POLE)) {
                 arm.goToHighCone();
@@ -389,11 +391,11 @@ public:
             else {
                 //arm.ShimHome();
                 arm.goToHome();
+                arm.SetShimTrim(0);
                 //arm.armGoToPos({35 + controls.LeftY() * -100, });
             }
         }
         arm.SetDisabled(controls.GetButtonToggled(STOP_ARM));
-        arm.SetShimTrim(controls.GetTrim() * 100);
         arm.test();
 		// Should run periodically no matter what - it cleans up after itself
         mainSwerve.ApplySpeed();

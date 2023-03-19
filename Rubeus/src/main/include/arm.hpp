@@ -204,7 +204,7 @@ public:
     }
 
     void goToHighCone() {
-        armGoToPos({125, 120});
+        armGoToPos({130, 120});
     }
 
     bool checkSwitches() {
