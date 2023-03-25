@@ -44,7 +44,7 @@ public:
     }
 };
 
-Arm <1, 0, 5, 1, 3> arm {
+Arm <2, 0, 5, 1, 3> arm {
 	new TalonSRXMotor(ARM_SHOULDER),
 	new SparkMotor(ARM_ELBOW),
 	new SparkMotor(ARM_HAND)

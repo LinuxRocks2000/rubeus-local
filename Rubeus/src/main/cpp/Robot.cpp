@@ -25,7 +25,12 @@
 #include "Positionizer.hpp"
 //#include "apriltags.h"
 
+#include <frc/DigitalOutput.h>
 #include <objects.hpp>
+
+//#define SHIM_MODE
+
+
 
 /*const vector blue_left_ramp {12.8, -1.5};
 const vector blue_mid_ramp {12.8, -1.9};
@@ -56,24 +61,17 @@ void zeroNavx(double offset = 0){
 
 bool onRamp = false;
 double x = .3;
+double rollOffset = 0;
 
-void autoRamp() {
-    frc::SmartDashboard::PutNumber("Navx roll", navx.GetRoll());
-    mainSwerve.SetDirection(90 * (4096/360));
-    if (!onRamp) {
-        mainSwerve.SetPercent(.3);
-        if (navx.GetRoll() * -1 > 10) {
-            onRamp = true;
-        }
-    }
-    else {
-        mainSwerve.SetDirection(90 * (4096/360));
-        float speed = navx.GetRoll() * -1 * .008;
-        mainSwerve.SetPercent(speed);
-    }
+void zeroRoll() {
+    rollOffset = navx.GetRoll();
 }
 
-bool driveTo(vector goal, bool goToZero = true, bool invertX = false, bool invertY = false){
+double getRoll() {
+    return navx.GetRoll() - rollOffset;
+}
+
+bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX = true, bool invertY = true){
     vector pos = odometry.Update(navxHeading());
     frc::SmartDashboard::PutNumber("Odometric X", pos.x);
     frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
@@ -91,26 +89,77 @@ bool driveTo(vector goal, bool goToZero = true, bool invertX = false, bool inver
     else {
         goY = goal.y - pos.y;
     }
-    vector translation = { goX, goY };
+    vector go = { goX, goY };
+    vector translation = go;
     vector rotation;
     PIDController<vector> rotController {&rotation};
+    //PIDController<vector> tranController {&translation};
     rotController.SetCircumference(360);
-    rotController.constants.MinOutput = -.23;
-    rotController.constants.MaxOutput = .23; 
+    rotController.constants.MinOutput = -.15;
+    rotController.constants.MaxOutput = .15; 
     rotController.constants.P = .012;
-    rotController.SetPosition(0);
-    //translation.setMagnitude(translation.magnitude() * 2); // Make the falloff steeper, because this is p term only
-    translation.speedLimit(0.2);
-    //translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+    rotController.SetPosition(zeroOffset);
+    translation.setMagnitude(translation.magnitude() * 1.5); // Make the falloff steeper, because this is p term only
+    translation.speedLimit(0.3);
+    translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+    //tranController.constants.MinOutput = -.38;//(translation.magnitude() * .25);
+    //tranController.constants.MaxOutput = .38;
+    //tranController.constants.P = .22;
+    //tranController.constants.D = 0.01;
     rotController.Update(navxHeading());
+    //tranController.SetPosition(0);
+    //tranController.Update(go.magnitude());
+    //translation.setMagnitude(go.magnitude() * 0.5);
+    //translation.speedLimit(0.7);
+    if (goY > 0){
+        //translation = translation.flip();
+    }
     if (goToZero) {
         mainSwerve.SetToVector(translation, rotation);
     }
     else {
         mainSwerve.SetToVector(translation, {});
     }
-    return translation.magnitude() < 0.04;
+    return translation.magnitude() < 0.03;
 }
+
+short state = 1;
+long current;
+
+bool goOverRamp() {
+    frc::SmartDashboard::PutNumber("Ramp state", state);
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    mainSwerve.SetDirection(90 * (4096/360));
+    if (state == 1) {
+        if (getRoll() < -5) {
+            state = 2;
+        }
+        mainSwerve.SetPercent(.35);
+    }
+    else if (state == 2) {
+        if (getRoll() > 5) {
+            state = 3;
+        }
+        mainSwerve.SetPercent(.35);
+    }
+    else if (state == 3) {
+        if (withinDeadband(getRoll(), 1, 0)) {
+            state = 4;
+            current = (double)frc::Timer::GetFPGATimestamp();
+        }
+        mainSwerve.SetPercent(.35);
+    }
+    else {
+        if (!(current + 1 <= (double)frc::Timer::GetFPGATimestamp())) {
+            mainSwerve.SetPercent(.2);
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
+} 
+
 
 enum MacroMode {
     TERMINATOR,
@@ -121,7 +170,9 @@ enum MacroMode {
     SHIM_TYPE,
     SHOOT_TYPE,
     ORIENT_TYPE,
-    PICKUP_TYPE
+    PICKUP_TYPE,
+    GO_OVER_RAMP_TYPE,
+    FORWARD_TYPE
 };
 
 double stopBarf;
@@ -138,7 +189,7 @@ vector squareUp(double offset = 0) {
     control.SetCircumference(360);
     control.constants.MinOutput = -.23;
     control.constants.MaxOutput = .23; 
-    control.constants.P = -.012;
+    control.constants.P = -.01;
     
     if (!squared) {
         control.SetPosition(offset);
@@ -149,6 +200,32 @@ vector squareUp(double offset = 0) {
         return rot;
     }
     return rot;
+}
+
+void autoRamp() {
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    if (!onRamp) {
+        mainSwerve.SetDirection(90 * (4096/360));
+        mainSwerve.SetPercent(.4);
+        if (getRoll() * -1 > 8) {
+            onRamp = true;
+        }
+    }
+    else {
+        //vector tran;
+        //tran.setMandA(getRoll() * -1 * .008, 90 * (4096/360));
+        //tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+
+        if (withinDeadband(getRoll(), 3, 0)) {
+            mainSwerve.SetPercent(0);
+            mainSwerve.SetLockTime(0);
+        }
+        else {
+            mainSwerve.SetDirection(90 * (4096/360));
+            mainSwerve.SetPercent(getRoll() * -1 * .008);
+            //mainSwerve.SetToVector(tran, {}/*squareUp()*/);
+        }
+    }
 }
 
 struct MacroOp {
@@ -164,9 +241,10 @@ class MacroController {
 	vector rotation;
     PIDController <vector> autoRotationController { &rotation };
     double target = 0;
+    double timeStarted = -1;
 public:
     MacroController() {
-
+        
     } 
     void operator=(MacroOp m[]){
         mnm = m;
@@ -198,8 +276,9 @@ public:
                 break;
             case DRIVE_TYPE:
                 onRamp = false;
-                if (driveTo(thing.pos, false)) {
+                if (driveTo(thing.pos, true, 180)) {
                     sP ++;
+                    std::cout << "drived there" << std::endl;
                     mainSwerve.SetToVector({0, 0}, {0, 0});
                 }
                 break;
@@ -209,7 +288,7 @@ public:
             case SHIM_TYPE:
                 arm.Shim(thing.shim);
                 arm.checkSwitches();
-                if (withinDeadband(-arm.ShimGet(), 40, thing.shim)){//arm.ShimGet() < -810) {
+                if (withinDeadband(-arm.ShimGet(), 70, thing.shim)){//arm.ShimGet() < -810) {
                     std::cout << "Shim done" << std::endl;
                     sP ++;
                 }
@@ -236,20 +315,38 @@ public:
                 break;
             case ORIENT_TYPE:
                 squared = false;
-                squareUp(thing.shim);
+                mainSwerve.SetToVector({}, squareUp(thing.shim));
                 if (squared) {
+                    std::cout << "oriented" << std::endl;
                     sP ++;
                 } 
                 //std::cout << "Rotation: " << rotation.magnitude() << std::endl;
                 break;
             case PICKUP_TYPE:
-                arm.armGoToPos({70, -10});
-                if (arm.atY(-10)){
-                    arm.armGoToPos({100, -10});
-                }
+                arm.armGoToPos({65, -15});
                 arm.SetGrab(INTAKE);
-                if (arm.atGoal({100, -10})) {
+                if (arm.atY(-15)){
+                    arm.armGoToPos({100, -15});
+                }
+                if (arm.atGoal({100, -15})) {
                     sP ++;
+                }
+                break;
+            case GO_OVER_RAMP_TYPE:
+                if (goOverRamp()) {
+                    sP ++;
+                    state = 1;
+                }
+                break;
+            case FORWARD_TYPE:
+                mainSwerve.SetDirection(90 * (4096/360));
+                mainSwerve.SetPercent(thing.pos.x * -1);          // don't ask
+                if (timeStarted == -1) {
+                    timeStarted = (double)frc::Timer::GetFPGATimestamp();
+                }
+                if ((double)frc::Timer::GetFPGATimestamp() > timeStarted + thing.shim) {
+                    sP ++;
+                    timeStarted = -1;
                 }
                 break;
         }
@@ -268,9 +365,10 @@ public:
         compressor.EnableDigital();
         arm.checkSwitches();
         mainSwerve.SetLockTime(1); // Time before the swerve drive locks, in seconds
+        circuitplayground.DisablePWM();
+        //circuitplayground.Pulse((units::time::second_t)1);
+        //circuitplayground.Set(true);
 	}
-
-    vector g = { 45, -5 };
 
     void armAux(){ // Arm auxiliary mode
         if (controls.GetButton(ELBOW_CONTROL)){
@@ -287,7 +385,9 @@ public:
         controls.update();
     }
 
-	void Synchronous(){
+    frc::DigitalOutput circuitplayground { 6 };
+
+    void DoShim() {
         vector pos = odometry.Update(navxHeading());
         frc::SmartDashboard::PutNumber("Odometric X", pos.x);
         frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
@@ -298,7 +398,7 @@ public:
 
 		float limit = controls.GetSpeedLimit();
         if (controls.GetButton(ZOOM_ZOOM)){
-            limit = 0.8;
+            limit = 1;
         }
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
@@ -314,18 +414,14 @@ public:
 		if (controls.GetButtonReleased(ZERO_NAVX)){
 			zeroNavx();
 		}
-
-        if (!controls.GetButtonToggled(STOP_ARM)){
-            if (controls.GetButton(ARM_INTAKE)){
-                arm.armGoToPos({ 113, 85 });
-                arm.SetGrab(INTAKE);
-            }
-            else if (controls.GetButton(ARM_BARF)){
-                arm.SetGrab(BARF);
-            }
-            else if (controls.GetButton(ARM_SHOOT)){
-                arm.SetGrab(SHOOT);
-            }
+        
+        if (controls.GetButton(ARM_BARF)){
+            arm.SetGrab(BARF);
+            //circuitplayground.UpdateDutyCycle(0);
+        }
+        else if (controls.GetButton(ARM_SHOOT)){
+            arm.SetGrab(SHOOT);
+            //circuitplayground.UpdateDutyCycle(0.5);
         }
         
         if (!controls.GetButtonToggled(STOP_ARM)){
@@ -334,21 +430,27 @@ public:
 
         if (controls.GetKey()){
             armSol.Set(frc::DoubleSolenoid::Value::kForward);
+            circuitplayground.Set(false);
         }
         else {
             armSol.Set(frc::DoubleSolenoid::Value::kReverse);
+            circuitplayground.Set(true);
         }
 
-        if (controls.GetButtonReleased(ARM_PICKUP)){
+        if (controls.GetButtonReleased(ARM_PICKUP_POS)){
             //arm.setRetract();
         }
 
-        if (controls.GetButtonReleased(ZERO)){
-            arm.Zero();
-            //arm.ShimZero();
+        if (controls.GetButton(ARM_INTAKE)) {
+            arm.SetGrab(INTAKE);
         }
-        arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
-        arm.SetShimTrim(controls.GetTrim() * 100);
+
+        if (controls.GetButtonReleased(ZERO)){
+            //arm.Zero();
+            arm.ShimZero();
+        }
+        //arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
+        arm.SetShimTrim(controls.GetTrim() * 200);
 		if (controls.GetButton(ELBOW_CONTROL)){
             arm.AuxSetPercent(0, controls.LeftY());
         }
@@ -363,50 +465,225 @@ public:
                 mainSwerve.SetToVector(translation, rotation.flip());
             }
             //arm.AuxSetPercent(0, 0);
-            arm.Update();
-            //arm.checkSwitches();
+            arm.checkSwitches();
             if (controls.GetButtonPressed(TOGGLE_OPTION_3)) {
                 //arm.Zero();
             }
-            if (controls.GetButton(ARM_PICKUP)) {
-                //arm.ShimPickup();
-                //arm.goToPickup();
-                //arm.armGoToPos({60, -12});
+            if (controls.GetButton(ARM_PICKUP_POS)) {
+                arm.ShimPickup();
                 //arm.armPickup();
-                arm.armGoToPos({60, -16});
-                arm.SetGrab(INTAKE);
-                arm.SetShimTrim(0);
+                //arm.SetShimTrim(0);
+            }
+            else if (controls.GetButton(ARM_INTAKE_POS)){
+                //arm.armGoToPos({ 113, 85 });
+                arm.ShimPickup();
+                //arm.SetGrab(INTAKE);
             }
             else if (controls.GetButton(HIGH_POLE)) {
-                arm.goToHighCone();
+                //arm.goToHighCone();
             }
             else if (controls.GetOption() == 1) {
-                arm.goToHighPole();
-                //arm.ShimPlaceHigh();
+                //arm.goToHighPole();
+                arm.ShimPlaceHigh();
             }
             else if (controls.GetOption() == 2) {
-                arm.goToLowPole();
-                //arm.ShimPlaceLow();
+                //arm.goToLowPole();
+                arm.ShimPlaceLow();
             }
             else {
-                //arm.ShimHome();
-                arm.goToHome();
+                arm.ShimHome();
                 arm.SetShimTrim(0);
+                //arm.goToHome();
+                //arm.armGoToPos({35 + controls.LeftY() * -100, });
+            }
+            /*if (controls.GetOptionPressed(3)) {
+                arm.Zero();
+            }
+            if (controls.GetOptionReleased(3)) {
+
+            }*/
+        }
+        arm.SetDisabled(controls.GetButtonToggled(STOP_ARM));
+        //arm.Update();
+        arm.ShimHand();
+        arm.test();
+		// Should run periodically no matter what - it cleans up after itself
+        mainSwerve.ApplySpeed();
+        controls.update();
+    }
+
+    void SynchronousTesting(){
+		vector translation {controls.LeftX(), controls.LeftY()};
+		vector rotation;
+		rotation.setMandA(controls.RightX(), PI/4);
+
+		float limit = controls.GetSpeedLimit();
+        if (controls.GetButton(ZOOM_ZOOM)){
+            limit = 1;
+        }
+		frc::SmartDashboard::PutNumber("Speed limit", limit);
+
+		rotation.dead(0.15);
+		translation.dead(0.12);
+
+		rotation.speedLimit(limit);
+		translation.speedLimit(limit);
+
+        translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+
+        mainSwerve.SetToVector(translation, rotation.flip());
+
+        mainSwerve.ApplySpeed();
+        controls.update();
+    }
+
+	void SynchronousFull(){
+        vector pos = odometry.Update(navxHeading());
+        frc::SmartDashboard::PutNumber("Odometric X", pos.x);
+        frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
+		frc::SmartDashboard::PutNumber("Odometry Quality", odometry.Quality());
+		vector translation {controls.LeftX(), controls.LeftY()};
+		vector rotation;
+		rotation.setMandA(controls.RightX(), PI/4);
+
+		float limit = controls.GetSpeedLimit();
+        if (controls.GetButton(ZOOM_ZOOM)){
+            limit = 1;
+        }
+		frc::SmartDashboard::PutNumber("Speed limit", limit);
+
+        squared = !controls.GetButton(SQUARE_UP);
+		rotation.dead(0.15);
+		translation.dead(0.12);
+
+		rotation.speedLimit(limit);
+		translation.speedLimit(limit);
+
+		translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+
+		if (controls.GetButtonReleased(ZERO_NAVX)){
+			zeroNavx();
+		}
+        
+        if (controls.GetButton(ARM_BARF)){
+            arm.SetGrab(BARF);
+            //circuitplayground.UpdateDutyCycle(0);
+        }
+        else if (controls.GetButton(ARM_SHOOT)){
+            arm.SetGrab(SHOOT);
+            //circuitplayground.UpdateDutyCycle(0.5);
+        }
+        
+        if (controls.GetKey()){
+            armSol.Set(frc::DoubleSolenoid::Value::kForward);
+            circuitplayground.Set(false);
+        }
+        else {
+            armSol.Set(frc::DoubleSolenoid::Value::kReverse);
+            circuitplayground.Set(true);
+        }
+
+        if (controls.GetButtonReleased(ARM_PICKUP_POS)){
+            //arm.setRetract();
+        }
+
+        if (controls.GetButton(ARM_INTAKE)) {
+            arm.SetGrab(INTAKE);
+        }
+
+        if (controls.GetButtonReleased(ZERO)){
+            #ifdef SHIM_MODE
+            arm.ShimZero();
+            #else
+            arm.Zero();
+            #endif
+        }
+        //arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
+        arm.SetShimTrim(controls.GetTrim() * 200);
+		if (controls.GetButton(ELBOW_CONTROL)){
+            arm.AuxSetPercent(0, controls.LeftY());
+        }
+        else if (controls.GetButton(SHOULDER_CONTROL)) {
+            arm.AuxSetPercent(controls.LeftY(), 0);
+        }
+        else{
+            if (!squared) {
+                mainSwerve.SetToVector(translation, squareUp());
+            }
+            else {
+                mainSwerve.SetToVector(translation, rotation.flip());
+            }
+            //arm.AuxSetPercent(0, 0);
+            arm.checkSwitches();
+            if (controls.GetButtonPressed(TOGGLE_OPTION_3)) {
+                //arm.Zero();
+            }
+            if (controls.GetButton(ARM_PICKUP_POS)) {
+                #ifdef SHIM_MODE
+                arm.ShimPickup();
+                #else
+                arm.armPickup();
+                #endif
+                arm.SetShimTrim(0);
+            }
+            else if (controls.GetButton(ARM_INTAKE_POS)){
+                #ifdef SHIM_MODE
+                arm.ShimPickup();
+                #else
+                arm.armGoToPos({ 113, 95 });
+                #endif
+                //arm.SetGrab(INTAKE);
+            }
+            else if (controls.GetButton(HIGH_POLE)) {
+                #ifndef SHIM_MODE
+                arm.goToHighCone();
+                #endif
+            }
+            else if (controls.GetOption() == 1) {
+                #ifdef SHIM_MODE
+                arm.ShimPlaceHigh();
+                #else
+                arm.goToHighPole();
+                #endif
+            }
+            else if (controls.GetOption() == 2) {
+                #ifdef SHIM_MODE
+                arm.ShimPlaceLow();
+                #else
+                arm.goToLowPole();
+                #endif
+            }
+            else {
+                #ifdef SHIM_MODE
+                arm.ShimHome();
+                arm.SetShimTrim(0);
+                #else
+                arm.goToHome();
+                #endif
                 //arm.armGoToPos({35 + controls.LeftY() * -100, });
             }
         }
         arm.SetDisabled(controls.GetButtonToggled(STOP_ARM));
+        #ifdef SHIM_MODE
+        arm.ShimHand();
+        #else
+        arm.Update();
+        #endif
         arm.test();
 		// Should run periodically no matter what - it cleans up after itself
         mainSwerve.ApplySpeed();
         controls.update();
 	}
+
+    void Synchronous(){
+        SynchronousFull();
+    }
 };
 
 /* 27-point auto (if it works) */
 
 MacroOp test[] {
-    {
+    /*{
         ARM_TYPE,
         highPole
     },
@@ -419,14 +696,25 @@ MacroOp test[] {
     },
     {
         DRIVE_TYPE,
-        {5, 5}
+        {5, 6}
+    },*/
+    {
+        PICKUP_TYPE
+    },
+    {
+        ARM_TYPE,
+        home
     },
     {
         TERMINATOR
     }
 };
 
-MacroOp test1[] {
+MacroOp shoot_taxi[] {
+    {
+        DRIVE_TYPE,
+        {4.7, 2.3}
+    },
     {
         ARM_TYPE,
         highPole
@@ -440,15 +728,49 @@ MacroOp test1[] {
     },
     {
         DRIVE_TYPE,
-        {0, 0}
+        {5.5, 4},
     },
     {
-        ORIENT_TYPE,
+        TERMINATOR
+    }
+};
+
+MacroOp shimMacro[] {
+    {
+        SHIM_TYPE,
         {},
-        90
+        -830
     },
     {
-        PICKUP_TYPE            // pickup cube,
+        SHOOT_TYPE
+    },
+    {
+        SHIM_TYPE,
+        {},
+        0
+    },
+    {
+        RAMP_TYPE
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp over_ramp[] {
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,
+        home
+    },
+    {
+        GO_OVER_RAMP_TYPE
     },
     {
         ORIENT_TYPE,
@@ -457,11 +779,124 @@ MacroOp test1[] {
     },
     {
         DRIVE_TYPE,
-        {0, 0}
+        {0, 0},
+        1
+    },
+    {
+        RAMP_TYPE
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp ihatethis[] {
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,           //place high,
+        home
+    },
+    {
+        FORWARD_TYPE,
+        {-.3, 0},
+        3.21579215315
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp twenty_one[] {
+    {
+        DRIVE_TYPE,
+        {4.7, 2.3},
+    },
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,           //place high,
+        home
     },
     {
         DRIVE_TYPE,
-        {0, 0}
+        {5.5, 4},
+    },
+    {
+        DRIVE_TYPE,
+        {4.7, 2.3},
+    },
+    {
+        DRIVE_TYPE,
+        {3.7, 2.4}
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        180
+    },
+    {
+        RAMP_TYPE
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp twenty_seven[] {
+    {
+        DRIVE_TYPE,
+        {4.7, 2.3},
+    },
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,           //place high,
+        home
+    },
+    {
+        DRIVE_TYPE,
+        {5.1, 6.2},
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        0
+    },
+    {
+        PICKUP_TYPE            // pickup cube,
+    },
+    {
+        ARM_TYPE,
+        home
+    },
+    {
+        ORIENT_TYPE,
+        {},
+        180
+    },
+    {
+        DRIVE_TYPE,
+        {4.8, 2.37},
+    },
+    {
+        DRIVE_TYPE,
+        {3, 2.18},
     },
     {
         ARM_TYPE,
@@ -544,6 +979,35 @@ MacroOp autoMacro[] {
     }
 };
 
+MacroOp climb[] = {
+    {
+        RAMP_TYPE
+    },
+    {
+        TERMINATOR
+    }
+};
+
+MacroOp oldBoi[] = {
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,           //place high,
+        home
+    },
+    {
+        RAMP_TYPE
+    },
+    {
+        TERMINATOR
+    }
+};
+
 class AutonomousMode : public RobotMode {
 	vector translation;
     MacroController macros;
@@ -553,13 +1017,15 @@ public:
 	}
 
 	void Start() {
-        macros = test;
+        macros = ihatethis;
         zeroNavx(180);
+        zeroRoll();
         onRamp = false;
         //resetBarf();
         //arm.SetDisabled(false);
-        mainSwerve.SetLockTime(30);
+        mainSwerve.SetLockTime(1);
         arm.zeroed = false;
+        state = 1;
         //compressor.EnableDigital();
         //arm.checkSwitches();
         //mainSwerve.SetLockTime(1); // Time before the swerve drive locks, in seconds
@@ -577,7 +1043,7 @@ public:
 
         /*goal = {1, 0};
         auto pos = odometry.Update();
-        translation = { pos.y - goal.y, pos.x - goal.x };
+        translation = { pos.y - goal.y.kl, pos.x - goal.x };
         translation.speedLimit(0.2);
         translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
         translation = translation.flip();
@@ -586,9 +1052,13 @@ public:
         rotation.setAngle(PI/4); // Standard rotation.
 		mainSwerve.SetToVector(translation, rotation);*/
 		mainSwerve.ApplySpeed();
+        #ifndef SHIM_MODE
         arm.Update();
+        #else
+        arm.ShimHand();
+        #endif
         arm.test();
-        //arm.ShimHand();
+        
         arm.SetShimTrim(0);
 	}
 
@@ -612,8 +1082,8 @@ int main() {
     //frc::CameraServer::StartAutomaticCapture();
     compressor.Disable();
 	mainSwerve.Link(&backRightSwerve); // Weird, right? This can in fact be used here.
-	backRightSwerve.Link(&frontRightSwerve);
-	frontRightSwerve.Link(&frontLeftSwerve);
+	backRightSwerve.Link(&frontLeftSwerve);
+	frontLeftSwerve.Link(&frontRightSwerve);
 	// As it turns out, int main actually still exists and even works here in FRC. I'm tempted to boil it down further and get rid of that stupid StartRobot function (replace it with something custom inside AwesomeRobot).
 	return frc::StartRobot<AwesomeRobot<TeleopMode, AutonomousMode, TestMode, DisabledMode>>(); // Look, the standard library does these nested templates more than I do.
 }

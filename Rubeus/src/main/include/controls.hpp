@@ -5,9 +5,10 @@
 enum Buttons {
     ELBOW_CONTROL,
     ARM_BARF,
-    ARM_INTAKE,
+    ARM_INTAKE_POS,
     SQUARE_UP,
-    ARM_PICKUP,
+    ARM_PICKUP_POS,
+    ARM_INTAKE,
     ZERO_NAVX,
     SHOULDER_CONTROL, 
     TOGGLE_OPTION_1,
@@ -51,12 +52,18 @@ class Controls {
     bool buttonReleasedStates[13];
     bool buttonToggledStates[13];
 
+    bool optionPressedStates[3];
+    bool optionReleasedStates[3];
 public:
     Controls() {
         for (int x = 0; x < 13; x ++) {
             buttonPressedStates[x] =  false;
             buttonReleasedStates[x] = false;
             buttonToggledStates[x] =  false;
+        }
+        for (int x = 0; x < 3; x ++) {
+            optionPressedStates[x] = false;
+            optionReleasedStates[x] = false;
         }
     }
 
@@ -68,9 +75,10 @@ public:
             usedCoords[RIGHT_X] = xbox.GetRawAxis(4);
             usedCoords[RIGHT_Y] = xbox.GetRawAxis(5);
             usedButtonStates[ZERO_NAVX] = xbox.GetRawButton(3);
-            usedButtonStates[ELBOW_CONTROL] = xbox.GetRawButton(5);
+            //usedButtonStates[ELBOW_CONTROL] = xbox.GetRawButton(5);
             //usedButtonStates[SHOULDER_CONTROL] = xbox.GetRawButton(6);
-            usedButtonStates[ARM_INTAKE] = false;
+            usedButtonStates[ARM_INTAKE] = xbox.GetRawButton(5);
+            usedAxis[ARM_TRIM] = xbox.GetRawAxis(2) - xbox.GetRawAxis(3);
             usedButtonStates[SQUARE_UP] = xbox.GetRawButton(4);
             usedButtonStates[ZOOM_ZOOM] = xbox.GetRawButton(6);
             usedButtonStates[ARM_SHOOT] = xbox.GetRawButton(8);
@@ -92,13 +100,13 @@ public:
             usedButtonStates[KEY] = buttonboard.GetRawButton(7);
             usedButtonStates[TOGGLE_OPTION_1] = buttonboard.GetRawButton(10);
             usedButtonStates[TOGGLE_OPTION_3] = buttonboard.GetRawButton(6);
-            usedButtonStates[ARM_PICKUP] = buttonboard.GetRawButton(3);
+            usedButtonStates[ARM_PICKUP_POS] = buttonboard.GetRawButton(3);
             usedButtonStates[ZERO] = buttonboard.GetRawButton(13);
-            usedAxis[ARM_TRIM] = buttonboard.GetRawAxis(2);
+            //usedAxis[ARM_TRIM] = buttonboard.GetRawAxis(2);
             usedButtonStates[STOP_ARM] = buttonboard.GetRawButton(8);
             usedButtonStates[SQUARE_UP] |= buttonboard.GetRawButton(9);
             usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(4);
-            usedButtonStates[ARM_INTAKE] = buttonboard.GetRawButton(5);
+            usedButtonStates[ARM_INTAKE_POS] = buttonboard.GetRawButton(5);
             usedButtonStates[PICKUP_MACRO] = buttonboard.GetRawButton(12);
             usedButtonStates[HIGH_POLE] = buttonboard.GetRawButton(11);
         }
@@ -168,6 +176,26 @@ public:
             return 3;
         }
         return 2;
+    }
+    bool GetOptionPressed(short num) {
+        if (GetOption() != num) {
+            optionPressedStates[num-1] = true;
+        }
+        else if (optionPressedStates[num-1]) {
+            optionPressedStates[num-1] = false;
+            return true;
+        }
+        return false;
+    }
+    bool GetOptionReleased(short num) {
+        if (GetOption() == num) {
+            optionReleasedStates[num-1] = true;
+        }
+        else if (optionReleasedStates[num-1]) {
+            optionReleasedStates[num-1] = false;
+            return true;
+        }
+        return false;
     }
     bool GetKey() {
         return GetButton(KEY);

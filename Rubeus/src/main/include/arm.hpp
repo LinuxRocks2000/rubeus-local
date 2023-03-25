@@ -138,16 +138,22 @@ public:
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.002;
+        elbowController -> constants.P = 0.001;
         elbowController -> constants.I = 0;
-        //elbowController -> constants.D = 0.05;
+        //elbowController -> constants.T = 0.000001;
+        //elbowController -> constants.TMin = 0.5;
+        //elbowController -> constants.TMax = 1.1;
+        //elbowController -> constants.D = 0.005;
         //elbowController -> constants.F = -0.05;
         elbowController -> constants.MinOutput = -0.2;
         elbowController -> constants.MaxOutput = 0.3;
         shoulderController = new PIDController(s);
-        shoulderController -> constants.P = 0.007;
+        shoulderController -> constants.P = 0.01;
         shoulderController -> constants.I = 0;
-        shoulderController -> constants.D = 0.04;
+        //shoulderController -> constants.T = 0.00001;
+        //shoulderController -> constants.TMin = 0.5;
+        //shoulderController -> constants.TMax = 1.1;
+        //shoulderController -> constants.D = 0.04;
         //shoulderController -> constants.F = 0.15;
         shoulderController -> constants.MinOutput = -0.3;
         shoulderController -> constants.MaxOutput = 0.3;
@@ -168,7 +174,7 @@ public:
         frc::SmartDashboard::PutNumber("Shoulder real", shoulderEncoder.GetValue());
         frc::SmartDashboard::PutNumber("Shoulder nice", GetShoulderPos());
         frc::SmartDashboard::PutNumber("Elbow real", elbowEncoder.GetValue());
-        frc::SmartDashboard::PutNumber("Elbow normal", GetNormalizedElbow());
+        frc::SmartDashboard::PutNumber("Elbow normal", elbowDefaultEncoderTicks);
         frc::SmartDashboard::PutNumber("Elbow nice", GetElbowPos());
         vector p = GetArmPosition();
         frc::SmartDashboard::PutNumber("Head X", p.x);
@@ -188,11 +194,11 @@ public:
     GrabMode grabMode;
     
     void goToHome(bool triggerSol = false) {
-        armGoToPos({30, 0});
+        armGoToPos({25, 0});
     }
 
     void goToPickup() {
-        armGoToPos({65, -15});
+        armGoToPos({70, -15});
     }
 
     void goToLowPole(bool high = false) {
@@ -204,7 +210,7 @@ public:
     }
 
     void goToHighCone() {
-        armGoToPos({130, 120});
+        armGoToPos({135, 120});
     }
 
     bool checkSwitches() {
@@ -219,14 +225,16 @@ public:
     }
 
     void armGoToPos(vector pos) {
+        const int highBound = 65;
+        const int lowBound = 35;
         goalPos = pos;
-        if ((curPos.x < 60) && (curPos.x > 30)){
+        if ((curPos.x < highBound) && (curPos.x > lowBound)){
             if (curPos.y < 0){
-                if (std::abs(curPos.x - 35) < std::abs(curPos.x - 60)){ // if it's closer to 35 than 60
-                    goalPos.x = 35;
+                if (std::abs(curPos.x - lowBound) < std::abs(curPos.x - highBound)){ // if it's closer to 35 than 60
+                    goalPos.x = lowBound + 5;
                 }
                 else{
-                    goalPos.x = 55;
+                    goalPos.x = highBound - 5;
                 }
             }
             goalPos.y = 5;
@@ -310,7 +318,7 @@ public:
 
     bool atGoal(vector goal){
         vector current = GetArmPosition();
-        return withinDeadband(current.x, 5, goal.x) && withinDeadband(current.y, 7, goal.y);
+        return withinDeadband(current.x, 15, goal.x) && withinDeadband(current.y, 15, goal.y);
         //return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
     }
 
@@ -339,7 +347,7 @@ public:
                 hand -> SetPercent(0.2);
             }
             else if (grabMode == SHOOT){
-                hand -> SetPercent(1);
+                hand -> SetPercent(0.675);
             }
             else {
                 hand -> SetPercent(0);
@@ -392,7 +400,7 @@ public:
         frc::SmartDashboard::PutNumber("Shouldah", shoulderController -> Update(shoulderEncoder.GetValue()));
         if (!disabled) {
             elbowController -> Update(elbowEncoder.GetValue());
-            shoulderController -> Update(shoulderEncoder.GetValue());
+            //shoulderController -> Update(shoulderEncoder.GetValue());     
         }
         else {
             AuxSetPercent(0, 0);
@@ -453,12 +461,20 @@ public:
     }
 
     void ShimHand(){
-        /*if (!disabled) {
+        if (!disabled) {
             if (grabMode == INTAKE){
-                hand -> SetPercent(0.2);
+                if (!boop.Get()){
+                    hand -> SetPercent(0);
+                }
+                else {
+                    hand -> SetPercent(-0.3);
+                }
             }
             else if (grabMode == BARF){
-                hand -> SetPercent(-0.1);
+                hand -> SetPercent(0.2);
+            }
+            else if (grabMode == SHOOT){
+                hand -> SetPercent(0.675);
             }
             else {
                 hand -> SetPercent(0);

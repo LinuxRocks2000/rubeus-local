@@ -51,7 +51,7 @@ public:
             lastGoodResult = ret;
         }
         else{
-            lastGoodResult += swerve -> GetEstimatedDisplacement().rotate(-heading);
+            //lastGoodResult += swerve -> GetEstimatedDisplacement().rotate(-heading);
             ret = lastGoodResult;
             isStale = true; // If it doesn't have an AprilTag, it's relying on less accurate relative odometry, and is thus stale
         }
