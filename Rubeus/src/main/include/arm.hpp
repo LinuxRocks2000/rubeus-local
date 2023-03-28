@@ -138,13 +138,14 @@ public:
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.001;
+        elbowController -> constants.P = 0.002;
+        elbowController -> constants.D = 0.00002;
         elbowController -> constants.I = 0;
         //elbowController -> constants.T = 0.000001;
         //elbowController -> constants.TMin = 0.5;
         //elbowController -> constants.TMax = 1.1;
         //elbowController -> constants.D = 0.005;
-        //elbowController -> constants.F = -0.05;
+        elbowController -> constants.F = 0.005;
         elbowController -> constants.MinOutput = -0.2;
         elbowController -> constants.MaxOutput = 0.3;
         shoulderController = new PIDController(s);
@@ -198,7 +199,7 @@ public:
     }
 
     void goToPickup() {
-        armGoToPos({70, -15});
+        armGoToPos({70, -14});
     }
 
     void goToLowPole(bool high = false) {
@@ -225,16 +226,22 @@ public:
     }
 
     void armGoToPos(vector pos) {
-        const int highBound = 65;
+        const int highBound = 67;
         const int lowBound = 35;
         goalPos = pos;
+        if (curPos.y < 1){
+            if ((curPos.x >= highBound) && (pos.x <= highBound)){
+                goalPos.y = 5;
+                goalPos.x = highBound + 5;
+            }
+        }
         if ((curPos.x < highBound) && (curPos.x > lowBound)){
-            if (curPos.y < 0){
+            if (curPos.y < 1){
                 if (std::abs(curPos.x - lowBound) < std::abs(curPos.x - highBound)){ // if it's closer to 35 than 60
                     goalPos.x = lowBound + 5;
                 }
                 else{
-                    goalPos.x = highBound - 5;
+                    goalPos.x = highBound - 2;
                 }
             }
             goalPos.y = 5;

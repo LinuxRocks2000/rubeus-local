@@ -179,7 +179,7 @@ class PIDController {
 
         //float f = setPoint * constants.F;
 
-        return (p + iState + d + constants.F) * t;
+        return (p + iState + d + (error < 0 ? constants.F : -constants.F)) * t;
     }
 
 public:

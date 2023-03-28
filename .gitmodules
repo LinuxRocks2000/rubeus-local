@@ -1,0 +1,3 @@
+[submodule "Rubeus/src/main/AutonomousMapper"]
+	path = Rubeus/src/main/AutonomousMapper
+	url = git@github.com:Firestorm-Robotics-Code/AutonomousMapper.git

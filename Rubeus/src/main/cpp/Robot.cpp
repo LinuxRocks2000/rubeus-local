@@ -23,6 +23,7 @@
 
 #include "controls.hpp"
 #include "Positionizer.hpp"
+#include "robot-http/robothttp.hpp"
 //#include "apriltags.h"
 
 #include <frc/DigitalOutput.h>

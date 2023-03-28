@@ -28,6 +28,11 @@ deploy {
                     files = project.fileTree('src/main/deploy')
                     directory = '/home/lvuser/deploy'
                 }
+
+                frcStaticFileDeploy(getArtifactTypeClass('FileTreeArtifact')) {
+                    files = project.fileTree('src/main/AutonomousMapper/robot-site')
+                    directory = '/home/lvuser/robot-site'
+                }
             }
         }
     }
@@ -61,6 +66,7 @@ model {
                 }
                 exportedHeaders {
                     srcDir 'src/main/include'
+                    srcDir 'src/main/AutonomousMapper/'
                 }
             }
 
