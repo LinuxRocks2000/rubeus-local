@@ -40,6 +40,7 @@ public:
             ret.y = limePos[0];
             if (frc::DriverStation::GetAlliance() == frc::DriverStation::kBlue){
                 ret.y *= -1;
+                ret.x -= .8;
             }
             lastGoodResult = ret;
         }

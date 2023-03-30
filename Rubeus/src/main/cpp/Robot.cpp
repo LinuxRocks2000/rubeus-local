@@ -161,35 +161,13 @@ bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX
     }
     vector go = { goX, goY };
     vector translation = go;
-    vector rotation;
-    PIDController<vector> rotController {&rotation};
-    //PIDController<vector> tranController {&translation};
-    rotController.SetCircumference(360);
-    rotController.constants.MinOutput = -.15;
-    rotController.constants.MaxOutput = .15; 
-    rotController.constants.P = .012;
-    rotController.SetPosition(zeroOffset);
-    translation.setMagnitude(translation.magnitude() * 3); // Make the falloff steeper, because this is p term only
-    translation.speedLimit(0.1);
+    translation.setMagnitude(translation.magnitude() * 3.5); // Make the falloff steeper, because this is p term only
+    translation.speedLimit(0.3);
     translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
-    //tranController.constants.MinOutput = -.38;//(translation.magnitude() * .25);
-    //tranController.constants.MaxOutput = .38;
-    //tranController.constants.P = .22;
-    //tranController.constants.D = 0.01;
-    rotController.Update(navxHeading());
-    //tranController.SetPosition(0);
-    //tranController.Update(go.magnitude());
-    //translation.setMagnitude(go.magnitude() * 0.5);
-    //translation.speedLimit(0.7);
     if (goY > 0){
         //translation = translation.flip();
     }
-    /*if (goToZero) {
-        mainSwerve.SetToVector(translation, rotation);
-    }
-    else {*/
-        mainSwerve.SetToVector(translation, squareUp());
-    //}
+    mainSwerve.SetToVector(translation, squareUp());
     return translation.magnitude() < 0.03;
 }
 
@@ -1148,6 +1126,19 @@ public:
                     {
                         0, 6
                     }
+                });
+            }
+            else if (s == "place-mid-cube"){
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    lowPole
+                });
+                dynamicMacro.push_back({
+                    SHOOT_TYPE
+                });
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    home
                 });
             }
         }
