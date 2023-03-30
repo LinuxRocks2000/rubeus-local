@@ -1148,6 +1148,19 @@ public:
                     BARF_TYPE
                 });
             }
+            else if (s == "go-over-ramp"){
+                dynamicMacro.push_back({
+                    GO_OVER_RAMP_TYPE
+                });
+            }
+            else if (s == "flip-one-eighty"){
+                navxOffset = smartLoop(navxOffset + 180, 360);
+                dynamicMacro.push_back({
+                    ORIENT_TYPE,
+                    {},
+                    0
+                });
+            }
         }
         dynamicMacro.push_back({
             TERMINATOR
