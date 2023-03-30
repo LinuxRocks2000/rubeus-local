@@ -43,6 +43,7 @@ struct PIDConstants { // Defaults: configure it yourself if you want it to run
     double I = 0; // Integral - sums over time
     double D = 0; // Derivative - damps motion to increase accuracy while decreasing speed (dangerous)
     double F = 0; // Constant feed - speed += F
+    double FError = 0;
     double T = 0; // Constant revulsion - speed -= 1 - T * (error^2), where T * error^2 is clamped to 0,1. The goal is to shift the curve forwards, so the fastest moments are in the middle instead of at the start.
     double TMin = 0.25;
     double TMax = 1;
@@ -156,15 +157,17 @@ class PIDController {
 
         double p = error * constants.P; // This does not need to be adjusted for FE
 
-        if (fabs(error) <= constants.iZone || constants.iZone == 0){ // no clue, I'm basically copy pasting. looks like IZone is a "zone" in which the I coefficient applies.
-            //iState += std::abs(error)/error * (constants.I) * FE; // *FE means that, if error * constants.I is 2, it will only actually gain 2 after 1 second/hz is passed. (20 ms by default). This keeps it smooth.
-            // This kind of thing is used all throughout platformer; very tested and stable
+        if ((std::abs(error) <= constants.iZone) || (constants.iZone == 0)){ // no clue, I'm basically copy pasting. looks like IZone is a "zone" in which the I coefficient applies.
+            if (error != 0){
+                iState += ((std::abs(error)/error) * (constants.I)) / FE; // /FE means that, if error * constants.I is 2, it will only actually gain 2 after 1 second/hz is passed. (20 ms by default). This keeps it smooth.
+                // This kind of thing is used all throughout platformer; very tested and stable
+            }
         }
         else{
             iState = 0;
         }
 
-        double d = (error - previousError);
+        double d = (error - previousError)/FE;
         previousError = error;
         d *= constants.D;
 
@@ -177,9 +180,15 @@ class PIDController {
         }
         t = 1 - t;
 
-        //float f = setPoint * constants.F;
+        float f = 0;
+        if (error > constants.FError){
+            f = -constants.F;
+        }
+        else if (error < constants.FError){
+            f = constants.F;
+        }
 
-        return (p + iState + d + (error < 0 ? constants.F : -constants.F)) * t;
+        return (p + iState + d + f) * t;
     }
 
 public:

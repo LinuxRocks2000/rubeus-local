@@ -138,16 +138,14 @@ public:
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.002;
-        elbowController -> constants.D = 0.00002;
-        elbowController -> constants.I = 0;
-        //elbowController -> constants.T = 0.000001;
-        //elbowController -> constants.TMin = 0.5;
-        //elbowController -> constants.TMax = 1.1;
-        //elbowController -> constants.D = 0.005;
-        elbowController -> constants.F = 0.005;
-        elbowController -> constants.MinOutput = -0.2;
-        elbowController -> constants.MaxOutput = 0.3;
+        elbowController -> constants.P = 0.005;
+        //elbowController -> constants.FError = 5;
+        //elbowController -> constants.F = 0.05;
+        //elbowController -> constants.I = -0.00001;
+        //elbowController -> constants.iZone = 20;
+        elbowController -> constants.D = 0.000001;//elbowController -> constants.D = 0.0000001;
+        elbowController -> constants.MinOutput = -0.5;
+        elbowController -> constants.MaxOutput = 0.15;
         shoulderController = new PIDController(s);
         shoulderController -> constants.P = 0.01;
         shoulderController -> constants.I = 0;
@@ -364,7 +362,7 @@ public:
         elbowWatcher -> Update();
         if (!zeroed){
             //std::cout << "is zero" << std::endl;
-            AuxSetPercent(0.4, 0.1);
+            AuxSetPercent(0.4, 0.2);
             zeroed = checkSwitches();
             return;
         }
