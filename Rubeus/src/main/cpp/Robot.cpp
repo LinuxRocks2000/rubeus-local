@@ -23,7 +23,7 @@
 
 #include "controls.hpp"
 #include "Positionizer.hpp"
-#include "robot-http/robothttp.hpp"
+//#include "robot-http/robothttp.hpp"        // This caused an error
 //#include "apriltags.h"
 
 #include <frc/DigitalOutput.h>
@@ -550,6 +550,9 @@ public:
 		float limit = controls.GetSpeedLimit();
         if (controls.GetButton(ZOOM_ZOOM)){
             limit = 1;
+        }
+        if (controls.GetButton(MOOZ_MOOZ)) {       // slow-down button, as requested
+            limit = .125;
         }
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
