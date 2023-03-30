@@ -177,34 +177,36 @@ long current;
 bool goOverRamp() {
     frc::SmartDashboard::PutNumber("Ramp state", state);
     frc::SmartDashboard::PutNumber("Navx roll", getRoll());
-    mainSwerve.SetDirection(90 * (4096/360));
+    vector translation;//mainSwerve.SetDirection(90 * (4096/360));
     if (state == 1) {
         if (getRoll() < -5) {
             state = 2;
         }
-        mainSwerve.SetPercent(.35);
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
     }
     else if (state == 2) {
         if (getRoll() > 5) {
             state = 3;
         }
-        mainSwerve.SetPercent(.35);
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
     }
     else if (state == 3) {
         if (withinDeadband(getRoll(), 1, 0)) {
             state = 4;
             current = (double)frc::Timer::GetFPGATimestamp();
         }
-        mainSwerve.SetPercent(.35);
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
     }
     else {
         if (!(current + 1 <= (double)frc::Timer::GetFPGATimestamp())) {
-            mainSwerve.SetPercent(.2);
+            translation.setMagnitude(0.2);//mainSwerve.SetPercent(.2);
         }
         else {
             return true;
         }
     }
+    translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+    mainSwerve.SetToVector(translation, squareUp());
     return false;
 } 
 
@@ -1139,6 +1141,11 @@ public:
                 dynamicMacro.push_back({
                     ARM_TYPE,
                     home
+                });
+            }
+            else if (s == "barf"){
+                dynamicMacro.push_back({
+                    BARF_TYPE
                 });
             }
         }
