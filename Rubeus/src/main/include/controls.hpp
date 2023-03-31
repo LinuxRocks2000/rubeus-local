@@ -19,7 +19,8 @@ enum Buttons {
     ZOOM_ZOOM,
     ARM_SHOOT,
     PICKUP_MACRO,
-    HIGH_POLE
+    HIGH_POLE,
+    MOOZ_MOOZ
 };
 
 
@@ -77,11 +78,12 @@ public:
             usedButtonStates[ZERO_NAVX] = xbox.GetRawButton(3);
             //usedButtonStates[ELBOW_CONTROL] = xbox.GetRawButton(5);
             //usedButtonStates[SHOULDER_CONTROL] = xbox.GetRawButton(6);
-            usedButtonStates[ARM_INTAKE] = xbox.GetRawButton(5);
+            usedButtonStates[ARM_INTAKE] = xbox.GetRawButton(2);
             usedAxis[ARM_TRIM] = xbox.GetRawAxis(2) - xbox.GetRawAxis(3);
             usedButtonStates[SQUARE_UP] = xbox.GetRawButton(4);
             usedButtonStates[ZOOM_ZOOM] = xbox.GetRawButton(6);
             usedButtonStates[ARM_SHOOT] = xbox.GetRawButton(8);
+            usedButtonStates[MOOZ_MOOZ] = xbox.GetRawButton(5);
         }
         if (joy.IsConnected()) {
             usedCoords[LEFT_X] = joy.GetRawAxis(0);
