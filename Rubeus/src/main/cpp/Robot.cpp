@@ -44,6 +44,50 @@ const vector red_right_ramp {1.22, -2};*/
 double navxOffset = 0;
 bool squared = true;
 
+std::vector<std::string> autoCommand;
+
+const std::string staticDir = "/home/lvuser/robot-site/";
+
+void onRequest(Request* req){
+	std::cout << req -> url << std::endl;
+    if (req -> url == "/api/postRobotCommands"){
+        std::cout << "Got a new set of robot commands: " << req -> body << std::endl;
+        autoCommand = splitString(req -> body, ',');
+        req -> response -> status = "418 I'm A Teapot";
+        req -> response -> body = "... and thus, I cannot make coffee";
+    }
+    else{ // doesn't match an api, do static file checks
+        std::string staticPath = staticDir + req -> url;
+        struct stat buffer;
+        if (stat((staticPath + "/index.html").c_str(), &buffer) == 0){
+            staticPath += "/index.html";
+        }
+        if (stat(staticPath.c_str(), &buffer) == 0){ // There is a potential exploit here relating to how POSIX directories are handled. Can you see it?
+            std::ifstream stream(staticPath);
+            std::stringstream buffer;
+            buffer << stream.rdbuf();
+            req -> response -> body = buffer.str();
+            if (ends_with(staticPath, ".html")){
+                req -> response -> contentType = "text/html";
+            }
+            else if (ends_with(staticPath, ".js")){
+                req -> response -> contentType = "text/javascript";
+            }
+            else if (ends_with(staticPath, ".css")){
+                req -> response -> contentType = "text/css";
+            }
+        }
+        else{
+            req -> response -> status = "404 Not Found";
+            req -> response -> contentType = "text/html";
+            req -> response -> body = "Whoopsie-diddle! You clearly don't know what page to visit! Get better n00b!<img src='https://gifsec.com/wp-content/uploads/2022/09/among-us-gif-3.gif' />";
+        }
+    }
+	req -> response -> send();
+}
+
+Server httpserver (5805, onRequest);
+
 long navxHeading(){
 	return smartLoop(navx.GetFusedHeading() - navxOffset, 360);
 }
@@ -72,116 +116,6 @@ double getRoll() {
     return navx.GetRoll() - rollOffset;
 }
 
-bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX = true, bool invertY = true){
-    vector pos = odometry.Update(navxHeading());
-    frc::SmartDashboard::PutNumber("Odometric X", pos.x);
-    frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
-    double goX;
-    double goY;
-    if (invertX) {
-        goX = pos.x - goal.x;
-    }
-    else {
-        goX = goal.x - pos.x;
-    }
-    if (invertY) {
-        goY = pos.y - goal.y;
-    }
-    else {
-        goY = goal.y - pos.y;
-    }
-    vector go = { goX, goY };
-    vector translation = go;
-    vector rotation;
-    PIDController<vector> rotController {&rotation};
-    //PIDController<vector> tranController {&translation};
-    rotController.SetCircumference(360);
-    rotController.constants.MinOutput = -.15;
-    rotController.constants.MaxOutput = .15; 
-    rotController.constants.P = .012;
-    rotController.SetPosition(zeroOffset);
-    translation.setMagnitude(translation.magnitude() * 1.5); // Make the falloff steeper, because this is p term only
-    translation.speedLimit(0.3);
-    translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
-    //tranController.constants.MinOutput = -.38;//(translation.magnitude() * .25);
-    //tranController.constants.MaxOutput = .38;
-    //tranController.constants.P = .22;
-    //tranController.constants.D = 0.01;
-    rotController.Update(navxHeading());
-    //tranController.SetPosition(0);
-    //tranController.Update(go.magnitude());
-    //translation.setMagnitude(go.magnitude() * 0.5);
-    //translation.speedLimit(0.7);
-    if (goY > 0){
-        //translation = translation.flip();
-    }
-    if (goToZero) {
-        mainSwerve.SetToVector(translation, rotation);
-    }
-    else {
-        mainSwerve.SetToVector(translation, {});
-    }
-    return translation.magnitude() < 0.03;
-}
-
-short state = 1;
-long current;
-
-bool goOverRamp() {
-    frc::SmartDashboard::PutNumber("Ramp state", state);
-    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
-    mainSwerve.SetDirection(90 * (4096/360));
-    if (state == 1) {
-        if (getRoll() < -5) {
-            state = 2;
-        }
-        mainSwerve.SetPercent(.35);
-    }
-    else if (state == 2) {
-        if (getRoll() > 5) {
-            state = 3;
-        }
-        mainSwerve.SetPercent(.35);
-    }
-    else if (state == 3) {
-        if (withinDeadband(getRoll(), 1, 0)) {
-            state = 4;
-            current = (double)frc::Timer::GetFPGATimestamp();
-        }
-        mainSwerve.SetPercent(.35);
-    }
-    else {
-        if (!(current + 1 <= (double)frc::Timer::GetFPGATimestamp())) {
-            mainSwerve.SetPercent(.2);
-        }
-        else {
-            return true;
-        }
-    }
-    return false;
-} 
-
-
-enum MacroMode {
-    TERMINATOR,
-    ARM_TYPE,
-    DRIVE_TYPE,
-    RAMP_TYPE,
-    BARF_TYPE,
-    SHIM_TYPE,
-    SHOOT_TYPE,
-    ORIENT_TYPE,
-    PICKUP_TYPE,
-    GO_OVER_RAMP_TYPE,
-    FORWARD_TYPE
-};
-
-double stopBarf;
-
-void resetBarf() {
-    stopBarf = (long)frc::Timer::GetFPGATimestamp() + 2;
-}
-
 vector rot;
 PIDController<vector> control {&rot};
 
@@ -203,7 +137,103 @@ vector squareUp(double offset = 0) {
     return rot;
 }
 
-void autoRamp() {
+bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX = true, bool invertY = false){
+    if (frc::DriverStation::GetAlliance() == frc::DriverStation::kRed){ // If it's on the red side, all the directions we move in are flipped for some reason.
+        invertX = !invertX;
+        //invertY = !invertY;
+    }
+    vector pos = odometry.Update(navxHeading());
+    frc::SmartDashboard::PutNumber("Odometric X", pos.x);
+    frc::SmartDashboard::PutNumber("Odometric Y", pos.y);
+    double goX;
+    double goY;
+    if (invertX) {
+        goX = pos.x - goal.x;
+    }
+    else {
+        goX = goal.x - pos.x;
+    }
+    if (invertY) {
+        goY = pos.y - goal.y;
+    }
+    else {
+        goY = goal.y - pos.y;
+    }
+    vector go = { goX, goY };
+    vector translation = go;
+    translation.setMagnitude(translation.magnitude() * 3.5); // Make the falloff steeper, because this is p term only
+    translation.speedLimit(0.3);
+    translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+    if (goY > 0){
+        //translation = translation.flip();
+    }
+    mainSwerve.SetToVector(translation, squareUp());
+    return translation.magnitude() < 0.03;
+}
+
+short state = 1;
+long current;
+
+bool goOverRamp() {
+    frc::SmartDashboard::PutNumber("Ramp state", state);
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    vector translation;//mainSwerve.SetDirection(90 * (4096/360));
+    if (state == 1) {
+        if (getRoll() < -5) {
+            state = 2;
+        }
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
+    }
+    else if (state == 2) {
+        if (getRoll() > 5) {
+            state = 3;
+        }
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
+    }
+    else if (state == 3) {
+        if (withinDeadband(getRoll(), 1, 0)) {
+            state = 4;
+            current = (double)frc::Timer::GetFPGATimestamp();
+        }
+        translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
+    }
+    else {
+        if (!(current + 1 <= (double)frc::Timer::GetFPGATimestamp())) {
+            translation.setMagnitude(0.2);//mainSwerve.SetPercent(.2);
+        }
+        else {
+            return true;
+        }
+    }
+    translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+    mainSwerve.SetToVector(translation, squareUp());
+    return false;
+} 
+
+
+enum MacroMode {
+    TERMINATOR,
+    ARM_TYPE,
+    DRIVE_TYPE,
+    RAMP_TYPE,
+    BARF_TYPE,
+    SHIM_TYPE,
+    SHOOT_TYPE,
+    ORIENT_TYPE,
+    PICKUP_TYPE,
+    GO_OVER_RAMP_TYPE,
+    FORWARD_TYPE,
+    FLIP_ORIENTATION_TYPE
+};
+
+double stopBarf;
+
+void resetBarf() {
+    stopBarf = (long)frc::Timer::GetFPGATimestamp() + 2;
+}
+
+
+/*void autoRamp() {
     frc::SmartDashboard::PutNumber("Navx roll", getRoll());
     if (!onRamp) {
         mainSwerve.SetDirection(90 * (4096/360));
@@ -224,9 +254,40 @@ void autoRamp() {
         else {
             mainSwerve.SetDirection(90 * (4096/360));
             mainSwerve.SetPercent(getRoll() * -1 * .008);
-            //mainSwerve.SetToVector(tran, {}/*squareUp()*/);
+            //mainSwerve.SetToVector(tran, {}squareUp());
         }
     }
+}*/
+
+int autoRampStartingOrientation = -1;
+
+void autoRamp() {
+    if (autoRampStartingOrientation == -1){
+        autoRampStartingOrientation = navxHeading();
+    }
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    vector tran;
+    if (!onRamp) {
+        //mainSwerve.SetDirection(90 * (4096/360));
+        tran.SetPercent(.4);
+        if (getRoll() * -1 > 8) {
+            onRamp = true;
+        }
+    }
+    else {
+        if (withinDeadband(getRoll(), 3, 0)) {
+            mainSwerve.SetPercent(0);
+            mainSwerve.Lock();
+            autoRampStartingOrientation = -1;
+        }
+        else {
+            tran.setMagnitude(getRoll() * -1 * .008);
+        }
+    }
+    tran.setAngle(3 * PI/2);
+    tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+    squared = false;
+    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
 }
 
 struct MacroOp {
@@ -250,6 +311,9 @@ public:
     void operator=(MacroOp m[]){
         mnm = m;
         sP = 0;
+        timeStarted = -1;
+        target = 0;
+        shootStartTime = -1;
     }
 
     void Update(){
@@ -339,9 +403,16 @@ public:
                     state = 1;
                 }
                 break;
+            case FLIP_ORIENTATION_TYPE:
+                navxOffset = smartLoop(navxOffset + 180, 360);
+                sP ++;
+                break;
             case FORWARD_TYPE:
-                mainSwerve.SetDirection(90 * (4096/360));
-                mainSwerve.SetPercent(thing.pos.x * -1);          // don't ask
+                //mainSwerve.SetDirection(90 * (4096/360));
+                //mainSwerve.SetPercent(thing.pos.x * -1);          // don't ask
+                vector tran = thing.pos;
+                tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+                mainSwerve.SetToVector(tran, {});
                 if (timeStarted == -1) {
                     timeStarted = (double)frc::Timer::GetFPGATimestamp();
                 }
@@ -571,11 +642,9 @@ public:
         
         if (controls.GetButton(ARM_BARF)){
             arm.SetGrab(BARF);
-            //circuitplayground.UpdateDutyCycle(0);
         }
         else if (controls.GetButton(ARM_SHOOT)){
             arm.SetGrab(SHOOT);
-            //circuitplayground.UpdateDutyCycle(0.5);
         }
         
         if (controls.GetKey()){
@@ -1015,13 +1084,106 @@ MacroOp oldBoi[] = {
 class AutonomousMode : public RobotMode {
 	vector translation;
     MacroController macros;
+    std::vector <MacroOp> dynamicMacro;
 public:
 	AutonomousMode(){
-
+        arm.goToHome();
 	}
 
 	void Start() {
-        macros = ihatethis;
+        dynamicMacro.clear();
+        for (std::string s : autoCommand){
+            if (s == "place-high-cube"){
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    highPole
+                });
+                dynamicMacro.push_back({
+                    SHOOT_TYPE
+                });
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    home
+                });
+            }
+            else if (s == "auto-ramp"){
+                dynamicMacro.push_back({
+                    RAMP_TYPE
+                });
+            }
+            else if (s == "taxi-out-short"){
+                dynamicMacro.push_back({
+                    FORWARD_TYPE,
+                    {
+                        0, -.3
+                    },
+                    2
+                });
+            }
+            else if (s == "taxi-out-long"){
+                dynamicMacro.push_back({
+                    FORWARD_TYPE,
+                    {
+                        0, -.3
+                    },
+                    3
+                });
+            }
+            else if (s == "go-to-short-cube"){
+                dynamicMacro.push_back({
+                    DRIVE_TYPE,
+                    {
+                        0, 0
+                    }
+                });
+            }
+            else if (s == "go-to-middle-cube"){
+                dynamicMacro.push_back({
+                    DRIVE_TYPE,
+                    {
+                        0, 6
+                    }
+                });
+            }
+            else if (s == "place-mid-cube"){
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    lowPole
+                });
+                dynamicMacro.push_back({
+                    SHOOT_TYPE
+                });
+                dynamicMacro.push_back({
+                    ARM_TYPE,
+                    home
+                });
+            }
+            else if (s == "barf"){
+                dynamicMacro.push_back({
+                    BARF_TYPE
+                });
+            }
+            else if (s == "go-over-ramp"){
+                dynamicMacro.push_back({
+                    GO_OVER_RAMP_TYPE
+                });
+            }
+            else if (s == "flip-one-eighty"){
+                dynamicMacro.push_back({
+                    FLIP_ORIENTATION_TYPE
+                });
+                /*dynamicMacro.push_back({
+                    ORIENT_TYPE,
+                    {},
+                    0
+                });*/
+            }
+        }
+        dynamicMacro.push_back({
+            TERMINATOR
+        });
+        //macros = ihatethis;
+        macros = &dynamicMacro[0]; // Because vectors are C arrays under the hood, this is perfectly valid
         zeroNavx(180);
         zeroRoll();
         onRamp = false;
@@ -1073,7 +1235,10 @@ public:
 
 
 class TestMode : public RobotMode {
-
+    void Synchronous(){
+        arm.AuxSetPercent(controls.LeftY(), controls.RightY());
+        controls.update();
+    }
 };
 
 
@@ -1081,9 +1246,19 @@ class DisabledMode : public RobotMode {
 
 };
 
+
+void servThread(){
+    while (true){
+        httpserver.Iterate();
+        usleep(1000); // Millisecond pause - this will make the server slower, but will also surrender a significant amount of time to the kernel for processing other more important threads.
+    }
+}
+
 #ifndef RUNNING_FRC_TESTS // I'm afraid to remove this.
 int main() {
-    //frc::CameraServer::StartAutomaticCapture();
+    frc::CameraServer::StartAutomaticCapture();
+    std::thread server(servThread);
+    server.detach();
     compressor.Disable();
 	mainSwerve.Link(&backRightSwerve); // Weird, right? This can in fact be used here.
 	backRightSwerve.Link(&frontLeftSwerve);

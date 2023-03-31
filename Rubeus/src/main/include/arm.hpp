@@ -360,11 +360,12 @@ public:
                 hand -> SetPercent(0);
             }
         }
+        grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
         if (!zeroed){
             //std::cout << "is zero" << std::endl;
-            AuxSetPercent(0.4, 0.1);
+            AuxSetPercent(0.4, 0.2);
             zeroed = checkSwitches();
             return;
         }
@@ -412,7 +413,6 @@ public:
         else {
             AuxSetPercent(0, 0);
         }
-        grabMode = OFF; // ain't sticky - don't want breakies
     }
 
     void ShimZero(){

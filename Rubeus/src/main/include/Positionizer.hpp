@@ -30,24 +30,18 @@ public:
         camera = nt::NetworkTableInstance::GetDefault().GetTable(camName);
     }
 
-    const vector Update(double heading) {
+    const vector Update(double heading) { // Trophy collected by Tyler: *****  *****
         heading *= PI/180;
         vector ret;
         double tid = camera -> GetNumber("tid", -1);
         if (tid >= 0){
-            double defVal[6] = { 0, 0, 0, 0, 0, 0 };
-            if (frc::DriverStation::GetAlliance() == frc::DriverStation::kBlue){
-                limePos = camera -> GetEntry("botpose_wpiblue").GetDoubleArray(defVal);
-            }
-            else if (frc::DriverStation::GetAlliance() == frc::DriverStation::kRed){
-                limePos = camera -> GetEntry("botpose_wpired").GetDoubleArray(defVal);
-            }
-            else{
-                limePos = camera -> GetEntry("botpose").GetDoubleArray(limePos);
-                std::cout << "ERROR! DriverStation::GetAlliance is returning insane values! This will interfere with odometry." << std::endl;
-            }
+            limePos = camera -> GetEntry("botpose").GetDoubleArray(limePos);
             ret.x = limePos[1];
             ret.y = limePos[0];
+            if (frc::DriverStation::GetAlliance() == frc::DriverStation::kBlue){
+                ret.y *= -1;
+                ret.x -= .8;
+            }
             lastGoodResult = ret;
         }
         else{
