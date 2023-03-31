@@ -222,7 +222,8 @@ enum MacroMode {
     ORIENT_TYPE,
     PICKUP_TYPE,
     GO_OVER_RAMP_TYPE,
-    FORWARD_TYPE
+    FORWARD_TYPE,
+    FLIP_ORIENTATION_TYPE
 };
 
 double stopBarf;
@@ -258,7 +259,12 @@ void resetBarf() {
     }
 }*/
 
+int autoRampStartingOrientation = -1;
+
 void autoRamp() {
+    if (autoRampStartingOrientation == -1){
+        autoRampStartingOrientation = navxHeading();
+    }
     frc::SmartDashboard::PutNumber("Navx roll", getRoll());
     vector tran;
     if (!onRamp) {
@@ -271,15 +277,17 @@ void autoRamp() {
     else {
         if (withinDeadband(getRoll(), 3, 0)) {
             mainSwerve.SetPercent(0);
-            mainSwerve.SetLockTime(0);
+            mainSwerve.Lock();
+            autoRampStartingOrientation = -1;
         }
         else {
             tran.setMagnitude(getRoll() * -1 * .008);
         }
     }
+    tran.setAngle(3 * PI/2);
     tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
     squared = false;
-    mainSwerve.SetToVector(tran, squareUp(180));
+    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
 }
 
 struct MacroOp {
@@ -394,6 +402,10 @@ public:
                     sP ++;
                     state = 1;
                 }
+                break;
+            case FLIP_ORIENTATION_TYPE:
+                navxOffset = smartLoop(navxOffset + 180, 360);
+                sP ++;
                 break;
             case FORWARD_TYPE:
                 //mainSwerve.SetDirection(90 * (4096/360));
@@ -1072,7 +1084,7 @@ class AutonomousMode : public RobotMode {
     std::vector <MacroOp> dynamicMacro;
 public:
 	AutonomousMode(){
-
+        arm.goToHome();
 	}
 
 	void Start() {
@@ -1154,12 +1166,14 @@ public:
                 });
             }
             else if (s == "flip-one-eighty"){
-                navxOffset = smartLoop(navxOffset + 180, 360);
                 dynamicMacro.push_back({
+                    FLIP_ORIENTATION_TYPE
+                });
+                /*dynamicMacro.push_back({
                     ORIENT_TYPE,
                     {},
                     0
-                });
+                });*/
             }
         }
         dynamicMacro.push_back({

@@ -358,6 +358,7 @@ public:
                 hand -> SetPercent(0);
             }
         }
+        grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
         if (!zeroed){
@@ -410,7 +411,6 @@ public:
         else {
             AuxSetPercent(0, 0);
         }
-        grabMode = OFF; // ain't sticky - don't want breakies
     }
 
     void ShimZero(){
