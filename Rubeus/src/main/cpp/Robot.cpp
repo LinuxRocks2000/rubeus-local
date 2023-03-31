@@ -23,7 +23,7 @@
 
 #include "controls.hpp"
 #include "Positionizer.hpp"
-//#include "robot-http/robothttp.hpp"        // This caused an error
+#include "robot-http/robothttp.hpp" // what error? you might need to update your build.gradle against master or something
 //#include "apriltags.h"
 
 #include <frc/DigitalOutput.h>
@@ -44,7 +44,7 @@ const vector red_right_ramp {1.22, -2};*/
 double navxOffset = 0;
 bool squared = true;
 
-std::vector<std::string> autoCommand;
+std::vector <std::string> autoCommand;
 
 const std::string staticDir = "/home/lvuser/robot-site/";
 
