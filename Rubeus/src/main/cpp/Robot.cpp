@@ -86,8 +86,6 @@ void onRequest(Request* req){
 	req -> response -> send();
 }
 
-Server httpserver (5805, onRequest);
-
 long navxHeading(){
 	return smartLoop(navx.GetFusedHeading() - navxOffset, 360);
 }
@@ -623,7 +621,7 @@ public:
             limit = 1;
         }
         if (controls.GetButton(MOOZ_MOOZ)) {       // slow-down button, as requested
-            limit = .125;
+            limit = .3;
         }
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
@@ -1248,6 +1246,7 @@ class DisabledMode : public RobotMode {
 
 
 void servThread(){
+    Server httpserver (5805, onRequest);
     while (true){
         httpserver.Iterate();
         usleep(1000); // Millisecond pause - this will make the server slower, but will also surrender a significant amount of time to the kernel for processing other more important threads.
@@ -1256,7 +1255,7 @@ void servThread(){
 
 #ifndef RUNNING_FRC_TESTS // I'm afraid to remove this.
 int main() {
-    frc::CameraServer::StartAutomaticCapture();
+    //frc::CameraServer::StartAutomaticCapture();
     std::thread server(servThread);
     server.detach();
     compressor.Disable();

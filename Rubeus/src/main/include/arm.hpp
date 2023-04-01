@@ -138,15 +138,16 @@ public:
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.012;
-        elbowController -> constants.D = 0.00003;
-        elbowController -> constants.I = 0;
+        elbowController -> constants.P = 0.01;
+        //elbowController -> constants.D = 0.00003;
+        //elbowController -> constants.I = 0.0001;
+        //elbowController -> constants.iZone = 45;
         //elbowController -> constants.T = 0.000001;
         //elbowController -> constants.TMin = 0.5;
         //elbowController -> constants.TMax = 1.1;
         //elbowController -> constants.D = 0.005;
-        elbowController -> constants.F = 0.005;
-        elbowController -> constants.MinOutput = -0.52;
+        //elbowController -> constants.F = 0.005;
+        elbowController -> constants.MinOutput = -0.5;
         elbowController -> constants.MaxOutput = 0.2;
         shoulderController = new PIDController(s);
         shoulderController -> constants.P = 0.01;
@@ -156,8 +157,8 @@ public:
         //shoulderController -> constants.TMax = 1.1;
         //shoulderController -> constants.D = 0.04;
         //shoulderController -> constants.F = 0.15;
-        shoulderController -> constants.MinOutput = -0.3;
-        shoulderController -> constants.MaxOutput = 0.3;
+        shoulderController -> constants.MinOutput = -0.5;
+        shoulderController -> constants.MaxOutput = 0.5;
         elbowController -> SetCircumference(4096);
         shoulderController -> SetCircumference(4096);
         shoulder -> ConfigIdleToBrake();
@@ -199,7 +200,12 @@ public:
     }
 
     void goToPickup() {
-        armGoToPos({70, -14});
+        if (curPos.x < 65){
+            armGoToPos({70, 5});
+        }
+        else{
+            armGoToPos({70, -10});
+        }
     }
 
     void goToLowPole(bool high = false) {
@@ -229,7 +235,8 @@ public:
         const int highBound = 67;
         const int lowBound = 35;
         goalPos = pos;
-        if (curPos.y < 1){
+
+        /*if (curPos.y < 1){
             if ((curPos.x >= highBound) && (pos.x <= highBound)){
                 goalPos.y = 5;
                 goalPos.x = highBound + 5;
@@ -238,14 +245,14 @@ public:
         if ((curPos.x < highBound) && (curPos.x > lowBound)){
             if (curPos.y < 1){
                 if (std::abs(curPos.x - lowBound) < std::abs(curPos.x - highBound)){ // if it's closer to 35 than 60
-                    goalPos.x = lowBound + 5;
+                    goalPos.x = lowBound;
                 }
                 else{
-                    goalPos.x = highBound - 2;
+                    goalPos.x = highBound;
                 }
             }
             goalPos.y = 5;
-        }
+        }*/
     }
 
     int GetNormalizedShoulder(){
@@ -357,7 +364,7 @@ public:
                 hand -> SetPercent(0.675);
             }
             else {
-                hand -> SetPercent(0);
+                hand -> SetPercent(-0.05);
             }
         }
         grabMode = OFF; // ain't sticky - don't want breakies
@@ -365,7 +372,7 @@ public:
         elbowWatcher -> Update();
         if (!zeroed){
             //std::cout << "is zero" << std::endl;
-            AuxSetPercent(0.4, 0.2);
+            AuxSetPercent(0.6, 0.4);
             zeroed = checkSwitches();
             return;
         }
