@@ -138,7 +138,8 @@ public:
         elbow = e;
         hand = h;
         elbowController = new PIDController(e);
-        elbowController -> constants.P = 0.01;
+        elbowController -> constants.P = 0.01; // THIS IS THE GOOD ONE
+        elbowController -> constants.P = 0.007; // REMOVE THIS
         //elbowController -> constants.D = 0.00003;
         //elbowController -> constants.I = 0.0001;
         //elbowController -> constants.iZone = 45;
@@ -147,8 +148,8 @@ public:
         //elbowController -> constants.TMax = 1.1;
         //elbowController -> constants.D = 0.005;
         //elbowController -> constants.F = 0.005;
-        elbowController -> constants.MinOutput = -0.5;
-        elbowController -> constants.MaxOutput = 0.2;
+        elbowController -> constants.MinOutput = -0.6;
+        elbowController -> constants.MaxOutput = 0.1;
         shoulderController = new PIDController(s);
         shoulderController -> constants.P = 0.01;
         shoulderController -> constants.I = 0;
@@ -200,7 +201,7 @@ public:
     }
 
     void goToPickup() {
-        if (curPos.x < 65){
+        if (curPos.x < 60){
             armGoToPos({70, 5});
         }
         else{
@@ -346,6 +347,7 @@ public:
     vector lastPos;
 
     void Update(){
+        elbowController -> constants.F = cos(GetElbowPos() * PI/180) * -0.2; // REMOVE THIS
         shoulderController -> highSwitch = shoulderLimitSwitch.Get();
         elbowController -> highSwitch = elbowLimitSwitch.Get();
         if (!disabled) {
@@ -358,7 +360,7 @@ public:
                 }
             }
             else if (grabMode == BARF){
-                hand -> SetPercent(0.2);
+                hand -> SetPercent(0.15);
             }
             else if (grabMode == SHOOT){
                 hand -> SetPercent(0.675);
@@ -370,9 +372,10 @@ public:
         grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
+        frc::SmartDashboard::PutNumber("Arm zeroed", zeroed);
         if (!zeroed){
             //std::cout << "is zero" << std::endl;
-            AuxSetPercent(0.6, 0.4);
+            AuxSetPercent(0.4, 0.4);
             zeroed = checkSwitches();
             return;
         }

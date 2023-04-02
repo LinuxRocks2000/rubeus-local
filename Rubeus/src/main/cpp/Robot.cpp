@@ -160,19 +160,24 @@ bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX
     vector go = { goX, goY };
     vector translation = go;
     translation.setMagnitude(translation.magnitude() * 3.5); // Make the falloff steeper, because this is p term only
-    translation.speedLimit(0.3);
+    translation.speedLimit(0.25);
     translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
     if (goY > 0){
         //translation = translation.flip();
     }
-    mainSwerve.SetToVector(translation, squareUp());
-    return translation.magnitude() < 0.03;
+    mainSwerve.SetToVector(translation, squareUp(10));
+    return translation.magnitude() < 0.02;
 }
 
 short state = 1;
 long current;
 
+int approachAngleOverRamp = -1;
+
 bool goOverRamp() {
+    if (approachAngleOverRamp == -1) {
+        approachAngleOverRamp = navxHeading();
+    }
     frc::SmartDashboard::PutNumber("Ramp state", state);
     frc::SmartDashboard::PutNumber("Navx roll", getRoll());
     vector translation;//mainSwerve.SetDirection(90 * (4096/360));
@@ -204,7 +209,7 @@ bool goOverRamp() {
         }
     }
     translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
-    mainSwerve.SetToVector(translation, squareUp());
+    mainSwerve.SetToVector(translation, squareUp(approachAngleOverRamp));
     return false;
 } 
 
@@ -259,7 +264,7 @@ void resetBarf() {
 
 int autoRampStartingOrientation = -1;
 
-void autoRamp() {
+bool autoRamp() {
     if (autoRampStartingOrientation == -1){
         autoRampStartingOrientation = navxHeading();
     }
@@ -268,7 +273,7 @@ void autoRamp() {
     if (!onRamp) {
         //mainSwerve.SetDirection(90 * (4096/360));
         tran.SetPercent(.4);
-        if (getRoll() * -1 > 8) {
+        if (std::abs(getRoll()) > 9) {
             onRamp = true;
         }
     }
@@ -277,15 +282,45 @@ void autoRamp() {
             mainSwerve.SetPercent(0);
             mainSwerve.Lock();
             autoRampStartingOrientation = -1;
+            return true;
         }
         else {
-            tran.setMagnitude(getRoll() * -1 * .008);
+            tran.setMagnitude(std::abs(getRoll()) * .008);
         }
     }
     tran.setAngle(3 * PI/2);
     tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
     squared = false;
-    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
+    mainSwerve.SetToVector(tran, squareUp(autoRampStartingOrientation));
+    return false;
+}
+
+short rampState = 1;
+
+bool autoRampFaster() {
+    vector apply;
+    if (rampState == 1) {
+        apply.SetPercent(.4);
+        if (std::abs(getRoll()) > 10) {
+            rampState = 2;
+        }
+    }
+    else if (rampState == 2) {
+        apply.SetPercent(.2);
+        if (withinDeadband(getRoll(), 8)) {
+            rampState = 3;
+            std::cout << "level" << std::endl;
+            mainSwerve.Lock();
+            mainSwerve.SetPercent(0);
+            return true;
+        }
+    }
+
+    apply.setAngle(3 * PI/2);
+    apply.setAngle(smartLoop(PI - apply.angle() + (navxHeading() * PI/180), PI * 2));
+    squared = false;
+    mainSwerve.SetToVector(apply, /*squareUp(autoRampStartingOrientation)*/squareUp(180));
+    return false;
 }
 
 struct MacroOp {
@@ -339,14 +374,16 @@ public:
                 break;
             case DRIVE_TYPE:
                 onRamp = false;
-                if (driveTo(thing.pos, true, 180)) {
+                if (driveTo(thing.pos)) {
                     sP ++;
                     std::cout << "drived there" << std::endl;
                     mainSwerve.SetToVector({0, 0}, {0, 0});
                 }
                 break;
             case RAMP_TYPE:
-                autoRamp();
+                if (autoRamp()){
+                    sP ++;
+                }
                 break;
             case SHIM_TYPE:
                 arm.Shim(thing.shim);
@@ -399,6 +436,7 @@ public:
                 if (goOverRamp()) {
                     sP ++;
                     state = 1;
+                    onRamp = false;
                 }
                 break;
             case FLIP_ORIENTATION_TYPE:
@@ -431,7 +469,7 @@ public:
 	vector goal { 2, 0 };
 
 	void Start(){
-		zeroNavx();
+		zeroNavx(180);
         compressor.EnableDigital();
         arm.checkSwitches();
         mainSwerve.SetLockTime(1); // Time before the swerve drive locks, in seconds
@@ -529,7 +567,13 @@ public:
         }
         else{
             if (!squared) {
-                mainSwerve.SetToVector(translation, squareUp());
+                std::cout << "called" << std::endl;
+                if (smartLoop(navxHeading()  - 180) > 270 || smartLoop(navxHeading() - 180) < 90) {    // square up to the nearest "180"
+                    mainSwerve.SetToVector(translation, squareUp(180));
+                }
+                else {
+                    mainSwerve.SetToVector(translation, squareUp());
+                }
             }
             else {
                 mainSwerve.SetToVector(translation, rotation.flip());
@@ -670,7 +714,7 @@ public:
             #endif
         }
         //arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
-        arm.SetShimTrim(controls.GetTrim() * 200);
+        arm.SetShimTrim(controls.GetTrim() * 100);
 		if (controls.GetButton(ELBOW_CONTROL)){
             arm.AuxSetPercent(0, controls.LeftY());
         }
@@ -679,7 +723,7 @@ public:
         }
         else{
             if (!squared) {
-                mainSwerve.SetToVector(translation, squareUp());
+                mainSwerve.SetToVector(translation, squareUp());                    
             }
             else {
                 mainSwerve.SetToVector(translation, rotation.flip());
@@ -695,7 +739,7 @@ public:
                 #else
                 arm.armPickup();
                 #endif
-                arm.SetShimTrim(0);
+                //arm.SetShimTrim(0);
             }
             else if (controls.GetButton(ARM_INTAKE_POS)){
                 #ifdef SHIM_MODE
@@ -1131,7 +1175,7 @@ public:
                 dynamicMacro.push_back({
                     DRIVE_TYPE,
                     {
-                        0, 0
+                        0, 6
                     }
                 });
             }
@@ -1139,7 +1183,15 @@ public:
                 dynamicMacro.push_back({
                     DRIVE_TYPE,
                     {
-                        0, 6
+                        -1.7, 6
+                    }
+                });
+            }
+            else if (s == "go-to-long-cube"){
+                dynamicMacro.push_back({
+                    DRIVE_TYPE,
+                    {
+                        -3.4, 6
                     }
                 });
             }
