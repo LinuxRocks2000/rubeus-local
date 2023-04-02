@@ -1025,7 +1025,7 @@ MacroOp twenty_seven[] {
     }
 };
 
-/////////////////////////////////////////////////////
+///////////////////////////////////////////////////// Test this one as well (incorporates new ramp code)
 MacroOp new_twenty_one {
     {
         ARM_TYPE,
