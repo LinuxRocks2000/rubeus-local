@@ -25,3 +25,6 @@
 #define ARM_SHOULDER 15
 #define ARM_ELBOW    14
 #define ARM_HAND     13
+
+#define RAMP_APPROACH_SPEED .5
+#define RAMP_PTERM .008

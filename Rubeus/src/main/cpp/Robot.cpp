@@ -161,21 +161,6 @@ bool goOverRamp() {
     return false;
 } 
 
-
-enum MacroMode {
-    TERMINATOR,
-    ARM_TYPE,
-    DRIVE_TYPE,
-    RAMP_TYPE,
-    BARF_TYPE,
-    SHIM_TYPE,
-    SHOOT_TYPE,
-    ORIENT_TYPE,
-    PICKUP_TYPE,
-    GO_OVER_RAMP_TYPE,
-    FORWARD_TYPE
-};
-
 double stopBarf;
 
 void resetBarf() {
@@ -203,11 +188,11 @@ vector squareUp(double offset = 0) {
     return rot;
 }
 
-void autoRamp() {
+/*void autoRamp() {
     frc::SmartDashboard::PutNumber("Navx roll", getRoll());
     if (!onRamp) {
         mainSwerve.SetDirection(90 * (4096/360));
-        mainSwerve.SetPercent(.4);
+        mainSwerve.SetPercent(RAMP_APPROACH_SPEED);
         if (getRoll() * -1 > 8) {
             onRamp = true;
         }
@@ -224,10 +209,126 @@ void autoRamp() {
         else {
             mainSwerve.SetDirection(90 * (4096/360));
             mainSwerve.SetPercent(getRoll() * -1 * .008);
-            //mainSwerve.SetToVector(tran, {}/*squareUp()*/);
+            //mainSwerve.SetToVector(tran, {});//squareUp());
         }
     }
+}*/
+int autoRampStartingOrientation = -1
+void autoRampBackwards() {
+    if (autoRampStartingOrientation == -1){
+        autoRampStartingOrientation = navxHeading();
+    }
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    vector tran;
+    if (!onRamp) {
+        //mainSwerve.SetDirection(90 * (4096/360));
+        tran.SetPercent(.4);
+        if (getRoll() * -1 > 8) {
+            onRamp = true;
+        }
+    }
+    else {
+        if (withinDeadband(getRoll(), 3, 0)) {
+            mainSwerve.SetPercent(0);
+            mainSwerve.Lock();
+            autoRampStartingOrientation = -1;
+        }
+        else {
+            tran.setMagnitude(getRoll() * -1 * RAMP_PTERM);
+        }
+    }
+    tran.setAngle(3 * PI/2);
+    tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+    squared = false;
+    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
 }
+
+//////////////////////////////////// TESTS ///////////////////////////////////////////////////
+
+/*
+    autoRampForward() should auto ramp forward.
+    autoRampFasterForward() should auto ramp, but start adjusting after it is level on the charge station (hopefully it's faster)
+    
+    If any constants need to be changed, change them in constants.h.
+
+    The new autoRampForward and backwards should be changed in the web app, but make sure they work first (I can add them if you need me too)
+*/
+
+void autoRampForward() {
+    if (autoRampStartingOrientation == -1){
+        autoRampStartingOrientation = navxHeading();
+    }
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    vector tran;
+    if (!onRamp) {
+        //mainSwerve.SetDirection(90 * (4096/360));
+        tran.SetPercent(RAMP_APPROACH_SPEED);
+        if (getRoll() > 8) {
+            onRamp = true;
+        }
+    }
+    else {
+        if (withinDeadband(getRoll(), 3, 0)) {
+            mainSwerve.SetPercent(0);
+            mainSwerve.Lock();
+            autoRampStartingOrientation = -1;
+        }
+        else {
+            tran.setMagnitude(getRoll() * RAMP_PTERM);
+        }
+    }
+    tran.setAngle(PI/2);
+    tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+    squared = false;
+    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
+}
+
+short rampState = 1
+
+void autoRampFasterForward() {
+    if (autoRampStartingOrientation == -1){
+        autoRampStartingOrientation = navxHeading();
+    }
+    frc::SmartDashboard::PutNumber("Navx roll", getRoll());
+    vector tran;
+    if (rampState == 1) {
+        //mainSwerve.SetDirection(90 * (4096/360));
+        tran.SetPercent(RAMP_APPROACH_SPEED);
+        if (getRoll() > 8) {
+            rampState = 2
+        }
+    }
+    else if (rampState == 2) {
+        if (withinDeadband(getRoll(), 1)) {
+            rampState = 3
+        }
+        else {
+            tran.SetPercent(RAMP_APPROACH_SPEED)
+        }
+    }
+    else {
+        tran.setMagnitude(getRoll() * RAMP_PTERM);
+    }
+    tran.setAngle(PI/2);
+    tran.setAngle(smartLoop(PI - tran.angle() + (navxHeading() * PI/180), PI * 2));
+    squared = false;
+    mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
+}
+
+enum MacroMode {
+    TERMINATOR,
+    ARM_TYPE,
+    DRIVE_TYPE,
+    RAMP_TYPE_BACKWARDS,
+    RAMP_TYPE_FORWARDS,
+    BARF_TYPE,
+    SHIM_TYPE,
+    SHOOT_TYPE,
+    ORIENT_TYPE,
+    PICKUP_TYPE,
+    GO_OVER_RAMP_TYPE,
+    FORWARD_TYPE
+};
 
 struct MacroOp {
     MacroMode type;
@@ -283,8 +384,11 @@ public:
                     mainSwerve.SetToVector({0, 0}, {0, 0});
                 }
                 break;
-            case RAMP_TYPE:
-                autoRamp();
+            case RAMP_TYPE_BACKWARDS:
+                autoRampBackwards();
+                break;
+            case RAMP_TYPE_FORWARDS:
+                autoRampFasterForward();
                 break;
             case SHIM_TYPE:
                 arm.Shim(thing.shim);
@@ -919,6 +1023,27 @@ MacroOp twenty_seven[] {
     {
         TERMINATOR
     }
+};
+
+/////////////////////////////////////////////////////
+MacroOp new_twenty_one {
+    {
+        ARM_TYPE,
+        highPole
+    },
+    {
+        SHOOT_TYPE
+    },
+    {
+        ARM_TYPE,
+        home
+    },
+    {
+        GO_OVER_RAMP_TYPE
+    },
+    {
+
+    }  
 };
 
 MacroOp autoMacro[] {
