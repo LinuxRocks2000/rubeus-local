@@ -9,3 +9,5 @@ We do it all in C++. A lot of people all throughout FRC say Java is better but s
 Makes you wonder.
 
 Seriously, Java is a dead language, everybody codes in Kotlin for JVM. Rust is a better language than C++ and we need to start using it on robots, but we already know C++ and it does teach a lot of useful things, so this year we ain't doing anything craszy. Well, we *are* doing craszy things, but we're doing them in C++.
+
+This is Tyler's local fork of Rubeus, which is currently being used as the primary codebase because bugs + deadlines happened.
