@@ -213,7 +213,7 @@ vector squareUp(double offset = 0) {
         }
     }
 }*/
-int autoRampStartingOrientation = -1
+int autoRampStartingOrientation = -1;
 void autoRampBackwards() {
     if (autoRampStartingOrientation == -1){
         autoRampStartingOrientation = navxHeading();
@@ -283,7 +283,7 @@ void autoRampForward() {
     mainSwerve.SetToVector(tran, /*squareUp(autoRampStartingOrientation)*/{});
 }
 
-short rampState = 1
+short rampState = 1;
 
 void autoRampFasterForward() {
     if (autoRampStartingOrientation == -1){
@@ -295,15 +295,15 @@ void autoRampFasterForward() {
         //mainSwerve.SetDirection(90 * (4096/360));
         tran.SetPercent(RAMP_APPROACH_SPEED);
         if (getRoll() > 8) {
-            rampState = 2
+            rampState = 2;
         }
     }
     else if (rampState == 2) {
         if (withinDeadband(getRoll(), 1)) {
-            rampState = 3
+            rampState = 3;
         }
         else {
-            tran.SetPercent(RAMP_APPROACH_SPEED)
+            tran.SetPercent(RAMP_APPROACH_SPEED);
         }
     }
     else {
@@ -858,7 +858,7 @@ MacroOp shimMacro[] {
         0
     },
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
@@ -891,7 +891,7 @@ MacroOp over_ramp[] {
         1
     },
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
@@ -954,7 +954,7 @@ MacroOp twenty_one[] {
         180
     },
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
@@ -1018,7 +1018,7 @@ MacroOp twenty_seven[] {
         home
     },
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
@@ -1026,7 +1026,7 @@ MacroOp twenty_seven[] {
 };
 
 ///////////////////////////////////////////////////// Test this one as well (incorporates new ramp code)
-MacroOp new_twenty_one {
+MacroOp new_twenty_one[] {
     {
         ARM_TYPE,
         highPole
@@ -1041,8 +1041,8 @@ MacroOp new_twenty_one {
     {
         GO_OVER_RAMP_TYPE
     },
-    {
-
+    {  
+        TERMINATOR
     }  
 };
 
@@ -1110,7 +1110,7 @@ MacroOp autoMacro[] {
 
 MacroOp climb[] = {
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
@@ -1130,7 +1130,7 @@ MacroOp oldBoi[] = {
         home
     },
     {
-        RAMP_TYPE
+        RAMP_TYPE_BACKWARDS
     },
     {
         TERMINATOR
