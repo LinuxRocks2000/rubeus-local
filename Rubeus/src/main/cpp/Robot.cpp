@@ -737,7 +737,7 @@ public:
                 #ifdef SHIM_MODE
                 arm.ShimPickup();
                 #else
-                arm.armPickup();
+                arm.gigaPickup();
                 #endif
                 //arm.SetShimTrim(0);
             }

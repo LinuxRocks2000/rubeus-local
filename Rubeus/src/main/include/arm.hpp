@@ -124,8 +124,7 @@ public:
     std::vector<ArmPosition> stack;
     vector goalPos;
     ArmInfo info;
-    bool retract = false;
-    bool sweeping = false;
+    short gigaPickupState = 0;
     frc::DigitalInput elbowLimitSwitch { elbowLimitswitchID };
     frc::DigitalInput shoulderLimitSwitch { shoulderLimitswitchID };
     frc::AnalogInput elbowEncoder { elbowID };
@@ -206,6 +205,12 @@ public:
         }
         else{
             armGoToPos({70, -10});
+        }
+    }
+
+    void gigaPickup() {
+        if (gigaPickupState != 2) {
+            gigaPickupState = 1;
         }
     }
 
@@ -305,9 +310,6 @@ public:
     }
 
     double setX = 35;
-    void setRetract(bool s = true) {
-        retract = s;
-    }
 
     void armPickup(bool triggerSol = true) {
         goToPickup();
@@ -369,6 +371,13 @@ public:
                 hand -> SetPercent(-0.05);
             }
         }
+        if (gigaPickupState == 2) {
+            goToHome();
+        }
+        else if (gigaPickupState == 1) {
+            armGoToPos({50, -7});
+        }
+
         grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
@@ -423,6 +432,7 @@ public:
         else {
             AuxSetPercent(0, 0);
         }
+        gigaPickupState = 0;
     }
 
     void ShimZero(){
