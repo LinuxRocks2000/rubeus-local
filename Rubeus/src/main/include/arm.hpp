@@ -157,7 +157,7 @@ public:
         //shoulderController -> constants.TMax = 1.1;
         //shoulderController -> constants.D = 0.04;
         //shoulderController -> constants.F = 0.15;
-        shoulderController -> constants.MinOutput = -0.5;
+        shoulderController -> constants.MinOutput = -0.3;
         shoulderController -> constants.MaxOutput = 0.5;
         elbowController -> SetCircumference(4096);
         shoulderController -> SetCircumference(4096);
@@ -207,8 +207,10 @@ public:
             armGoToPos({70, -10});
         }
     }
-    double gigaX = 70;
-    void gigaPickup() {
+    double gigaX = 0;
+    bool giga = false;
+    bool gigaPickup() {
+        giga = true;
         SetGrab(INTAKE);
         if (gigaPickupState == 0) {
             gigaPickupState = 1;
@@ -216,20 +218,23 @@ public:
         }
 
         if (gigaPickupState == 1) {
-            armGoToPos({gigaX, -10});
+            armGoToPos({65 + gigaX, -10});
             if (atY(-10)) {
                 gigaX += .06;
             }
-            if (atGoal({120, -10})) {
+            if (curPos.x > 120) {
                 gigaPickupState = 2;
             }
         }
         else if (gigaPickupState == 2) {
             goToHome();
-            if (atGoal({30, 0})) {
+            if (curPos.x < 40) {
                 gigaPickupState = 0;
+                gigaX = 0;
+                return true;
             }
         }
+        return false;
     }
 
     void goToLowPole(bool high = false) {
@@ -256,7 +261,7 @@ public:
     }
 
     void armGoToPos(vector pos) {
-        const int highBound = 60;
+        const int highBound = 50;
         const int lowBound = 35;
         goalPos = pos;
 
@@ -358,8 +363,8 @@ public:
     }
 
     bool atY(double val) {
-        double curr = GetArmPosition().y;
-        return withinDeadband(curr, 7, val);
+        //double curr = GetArmPosition().y;
+        return withinDeadband(curPos.y, 3, val);
     }
 
     bool zeroed = false;
@@ -367,7 +372,12 @@ public:
     vector lastPos;
 
     void Update(){
-        elbowController -> constants.F = cos(GetElbowPos() * PI/180) * -0.2; // REMOVE THIS
+        if (!giga){
+            gigaX = 0;
+        }
+        giga = false;
+        elbowController -> constants.F = cos(GetElbowPos() * PI/180) * -0.27; // REMOVE THIS
+        elbowController -> constants.MaxOutput = std::abs(sin(GetElbowPos() * PI/180)) * 0.2; // I have a theory.
         shoulderController -> highSwitch = shoulderLimitSwitch.Get();
         elbowController -> highSwitch = elbowLimitSwitch.Get();
         if (!disabled) {

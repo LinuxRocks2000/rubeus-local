@@ -135,7 +135,12 @@ vector squareUp(double offset = 0) {
     return rot;
 }
 
+int initialDriveToAngle = -1;
+
 bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX = true, bool invertY = false){
+    if (initialDriveToAngle == -1){
+        initialDriveToAngle = navxHeading();
+    }
     if (frc::DriverStation::GetAlliance() == frc::DriverStation::kRed){ // If it's on the red side, all the directions we move in are flipped for some reason.
         invertX = !invertX;
         //invertY = !invertY;
@@ -165,8 +170,13 @@ bool driveTo(vector goal, bool goToZero = true, int zeroOffset = 0, bool invertX
     if (goY > 0){
         //translation = translation.flip();
     }
-    mainSwerve.SetToVector(translation, squareUp(10));
-    return translation.magnitude() < 0.02;
+    squared = false;
+    mainSwerve.SetToVector(translation, squareUp(initialDriveToAngle));
+    if (translation.magnitude() < 0.02) {
+        initialDriveToAngle = -1;
+        return true;
+    }
+    return false;
 }
 
 short state = 1;
@@ -226,7 +236,8 @@ enum MacroMode {
     PICKUP_TYPE,
     GO_OVER_RAMP_TYPE,
     FORWARD_TYPE,
-    FLIP_ORIENTATION_TYPE
+    FLIP_ORIENTATION_TYPE,
+    SQUARE_UP_TYPE
 };
 
 double stopBarf;
@@ -273,7 +284,7 @@ bool autoRamp() {
     if (!onRamp) {
         //mainSwerve.SetDirection(90 * (4096/360));
         tran.SetPercent(.4);
-        if (std::abs(getRoll()) > 9) {
+        if (std::abs(getRoll()) > 11) {
             onRamp = true;
         }
     }
@@ -296,7 +307,7 @@ bool autoRamp() {
 }
 
 short rampState = 1;
-
+/*
 bool autoRampFaster() {
     vector apply;
     if (rampState == 1) {
@@ -319,9 +330,9 @@ bool autoRampFaster() {
     apply.setAngle(3 * PI/2);
     apply.setAngle(smartLoop(PI - apply.angle() + (navxHeading() * PI/180), PI * 2));
     squared = false;
-    mainSwerve.SetToVector(apply, /*squareUp(autoRampStartingOrientation)*/squareUp(180));
+    mainSwerve.SetToVector(apply, squareUp(180));
     return false;
-}
+}*/
 
 struct MacroOp {
     MacroMode type;
@@ -423,25 +434,37 @@ public:
                 //std::cout << "Rotation: " << rotation.magnitude() << std::endl;
                 break;
             case PICKUP_TYPE:
-                arm.armGoToPos({65, -15});
+                /*arm.armGoToPos({65, -15});
                 arm.SetGrab(INTAKE);
                 if (arm.atY(-15)){
                     arm.armGoToPos({100, -15});
                 }
                 if (arm.atGoal({100, -15})) {
                     sP ++;
+                }*/
+                //;
+                if (arm.gigaPickup()){
+                    sP ++;
                 }
                 break;
             case GO_OVER_RAMP_TYPE:
                 if (goOverRamp()) {
                     sP ++;
-                    state = 1;
+                    //state = 1;
                     onRamp = false;
+                    std::cout << "RAMPED" << std::endl;
                 }
                 break;
             case FLIP_ORIENTATION_TYPE:
                 navxOffset = smartLoop(navxOffset + 180, 360);
                 sP ++;
+                break;
+            case SQUARE_UP_TYPE:
+                squared = false;
+                squareUp();
+                if (squared){
+                    sP ++;
+                }
                 break;
             case FORWARD_TYPE:
                 //mainSwerve.SetDirection(90 * (4096/360));
@@ -1191,7 +1214,7 @@ public:
                 dynamicMacro.push_back({
                     DRIVE_TYPE,
                     {
-                        -3.4, 6
+                        -3.6, 6
                     }
                 });
             }
@@ -1227,6 +1250,38 @@ public:
                     {},
                     0
                 });*/
+            }
+            else if (s == "square-up"){
+                dynamicMacro.push_back({
+                    SQUARE_UP_TYPE
+                });
+            }
+            else if (s == "go-to-second-cube-pickup"){
+                dynamicMacro.push_back({
+                    DRIVE_TYPE,
+                    { -3.6, 2.5 } 
+                });
+                dynamicMacro.push_back({
+                    ORIENT_TYPE,
+                    {},
+                    350
+                });
+            }
+            else if (s == "go-to-middle-pickup"){
+                dynamicMacro.push_back({
+                    DRIVE_TYPE,
+                    { -2.3, 2.5 } 
+                });
+                dynamicMacro.push_back({
+                    ORIENT_TYPE,
+                    {},
+                    0
+                });
+            }
+            else if (s == "pickup"){
+                dynamicMacro.push_back({
+                    PICKUP_TYPE
+                });
             }
         }
         dynamicMacro.push_back({
