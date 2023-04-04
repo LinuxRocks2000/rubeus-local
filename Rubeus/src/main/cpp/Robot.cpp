@@ -748,10 +748,12 @@ public:
 
 		translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
 
-        translation += DoBuffeter();
-        //tranJitter = randJitter(0.4) * 0.01 + tranJitter * 0.99;
-        //translation.setMagnitude(translation.magnitude() * tranJitter);
-        rotation.setMandA(rotation.magnitude() * randJitter(0.4), rotation.angle() * randJitter(0.4));
+        if (controls.isSecret){
+            translation += DoBuffeter();
+            //tranJitter = randJitter(0.4) * 0.01 + tranJitter * 0.99;
+            //translation.setMagnitude(translation.magnitude() * tranJitter);
+            rotation.setMandA(rotation.magnitude() * randJitter(0.4), rotation.angle() * randJitter(0.4));
+        }
 
 		if (controls.GetButtonReleased(ZERO_NAVX)){
 			zeroNavx();

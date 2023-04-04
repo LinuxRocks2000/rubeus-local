@@ -55,7 +55,12 @@ class Controls {
 
     bool optionPressedStates[3];
     bool optionReleasedStates[3];
+
+    int secret = 0;
+    int oldPOV = 0;
 public:
+    bool isSecret = false;
+
     Controls() {
         for (int x = 0; x < 13; x ++) {
             buttonPressedStates[x] =  false;
@@ -71,6 +76,40 @@ public:
     void update() {
         usedAxis[SPEED_LIMIT] = 0.3;
         if (xbox.IsConnected()) {            
+            if (xbox.GetPOV() == -1){
+                if (oldPOV == 90){ // up
+                    if (secret < 2){
+                        secret ++;
+                    }
+                    else{
+                        secret = 0;
+                    }
+                }
+                else if (oldPOV == 270){ // down
+                    if ((secret >= 2) && (secret < 4)){
+                        secret ++;
+                    }
+                    else{
+                        secret = 0;
+                    }
+                }
+                else if (oldPOV == 0){ // right
+                    if ((secret == 4) || (secret == 6)){
+                        secret ++;
+                    }
+                    else{
+                        secret = 0;
+                    }
+                }
+                else if (oldPOV == 180){ // left
+                    if ((secret == 5) || (secret == 7)){
+                        secret ++;
+                    }
+                    else{
+                        secret = 0;
+                    }
+                }
+            }
             usedCoords[LEFT_X] = xbox.GetRawAxis(0);
             usedCoords[LEFT_Y] = xbox.GetRawAxis(1);
             usedCoords[RIGHT_X] = xbox.GetRawAxis(4);
@@ -84,6 +123,20 @@ public:
             usedButtonStates[ZOOM_ZOOM] = xbox.GetRawButton(6);
             usedButtonStates[ARM_SHOOT] = xbox.GetRawButton(8);
             usedButtonStates[MOOZ_MOOZ] = xbox.GetRawButton(5);
+            if (usedButtonStates[ARM_SHOOT]){
+                if (secret == 8){
+                    secret ++;
+                }
+                else{
+                    secret = 0;
+                }
+            }
+            else {
+                if (secret == 9){
+                    isSecret = !isSecret;
+                }
+            }
+            oldPOV = xbox.GetPOV();
         }
         if (joy.IsConnected()) {
             usedCoords[LEFT_X] = joy.GetRawAxis(0);
