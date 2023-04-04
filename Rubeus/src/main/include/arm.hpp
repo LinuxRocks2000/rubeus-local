@@ -138,7 +138,7 @@ public:
         hand = h;
         elbowController = new PIDController(e);
         elbowController -> constants.P = 0.01; // THIS IS THE GOOD ONE
-        elbowController -> constants.P = 0.007; // REMOVE THIS
+        elbowController -> constants.P = 0.003; // REMOVE THIS
         //elbowController -> constants.D = 0.00003;
         //elbowController -> constants.I = 0.0001;
         //elbowController -> constants.iZone = 45;
@@ -207,10 +207,28 @@ public:
             armGoToPos({70, -10});
         }
     }
-
+    double gigaX = 70;
     void gigaPickup() {
-        if (gigaPickupState != 2) {
+        SetGrab(INTAKE);
+        if (gigaPickupState == 0) {
             gigaPickupState = 1;
+            goToHome();
+        }
+
+        if (gigaPickupState == 1) {
+            armGoToPos({gigaX, -10});
+            if (atY(-10)) {
+                gigaX += .06;
+            }
+            if (atGoal({120, -10})) {
+                gigaPickupState = 2;
+            }
+        }
+        else if (gigaPickupState == 2) {
+            goToHome();
+            if (atGoal({30, 0})) {
+                gigaPickupState = 0;
+            }
         }
     }
 
@@ -238,11 +256,11 @@ public:
     }
 
     void armGoToPos(vector pos) {
-        const int highBound = 67;
+        const int highBound = 60;
         const int lowBound = 35;
         goalPos = pos;
 
-        /*if (curPos.y < 1){
+        if (curPos.y < 1){
             if ((curPos.x >= highBound) && (pos.x <= highBound)){
                 goalPos.y = 5;
                 goalPos.x = highBound + 5;
@@ -258,7 +276,7 @@ public:
                 }
             }
             goalPos.y = 5;
-        }*/
+        }
     }
 
     int GetNormalizedShoulder(){
@@ -321,7 +339,7 @@ public:
                 }
             }
             else {
-                armGoToPos({setX, -10});
+                armGoToPos({setX, -10};
                 hand -> SetPercent(.35);
                 setX += .005;
                 if (Has() || setX > 150) {
@@ -335,7 +353,7 @@ public:
 
     bool atGoal(vector goal){
         vector current = GetArmPosition();
-        return withinDeadband(current.x, 15, goal.x) && withinDeadband(current.y, 15, goal.y);
+        return withinDeadband(current.x, 5, goal.x) && withinDeadband(current.y, 5, goal.y);
         //return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
     }
 
@@ -371,12 +389,7 @@ public:
                 hand -> SetPercent(-0.05);
             }
         }
-        if (gigaPickupState == 2) {
-            goToHome();
-        }
-        else if (gigaPickupState == 1) {
-            armGoToPos({50, -7});
-        }
+        frc::SmartDashboard::PutNumber("giga pickup", gigaPickupState);
 
         grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
@@ -432,7 +445,7 @@ public:
         else {
             AuxSetPercent(0, 0);
         }
-        gigaPickupState = 0;
+        //gigaPickupState = 0;
     }
 
     void ShimZero(){
