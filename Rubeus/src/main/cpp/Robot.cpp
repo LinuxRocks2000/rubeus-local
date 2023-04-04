@@ -1,6 +1,8 @@
 /* By Tyler Clarke
 	This is an experiment with c++20 features and new paradigms to make FRC robot code cleaner.
 	The idea: structuring an FRC robot like a real C++ program instead of like Java gone even wronger. Craszy.
+
+    ITS DEFENSE TIME BUFFETT BUFFETT BUFFETT BWAHAHAHAHAHAHAHAHAHAHAHAHA
 */
 
 #define PI 3.141592
@@ -31,6 +33,7 @@
 
 //#define SHIM_MODE
 
+#define DEFENSE_CAP 4 // 4 bots max will be in your way
 
 
 /*const vector blue_left_ramp {12.8, -1.5};
@@ -273,6 +276,10 @@ void resetBarf() {
     }
 }*/
 
+inline double randJitter(double amount){
+    return 1 + 2 * amount * ((double)std::rand()/RAND_MAX - 0.5);
+}
+
 int autoRampStartingOrientation = -1;
 
 bool autoRamp() {
@@ -484,9 +491,19 @@ public:
     }
 };
 
+
+struct Buffet { // Buffets actually ramp upwards over time - this curve means the drivers will be able to tell when it's about to get rammed.
+    vector goal;
+    vector current;
+    unsigned long duration;
+};
+
+
 frc::GenericHID buttonboard {5};
 class TeleopMode : public RobotMode {
 public:
+    std::vector<Buffet> buffets;
+
 	ArmPosition p { 120, 120 }; //no
 
 	vector goal { 2, 0 };
@@ -500,6 +517,34 @@ public:
         //circuitplayground.Pulse((units::time::second_t)1);
         //circuitplayground.Set(true);
 	}
+
+    vector DoBuffeter(){
+        vector ret;
+        if (buffets.size() < DEFENSE_CAP){
+            if (std::rand()%100 < 10){
+                buffets.push_back({
+                    {
+                        0.3 * ((double)std::rand() / (double)RAND_MAX) - 0.15,
+                        0.3 * ((double)std::rand() / (double)RAND_MAX) - 0.15
+                    }, {},
+                    std::rand() % 500
+                });
+            }
+        }
+        for (size_t x = 0; x < buffets.size(); x ++){
+            Buffet& buffet = buffets[x];
+            buffet.current.setMandA(buffet.current.magnitude() * 0.5 + buffet.goal.magnitude() * 0.5, buffet.goal.angle());
+            buffet.duration --;
+            if (buffet.duration <= 0){
+                buffets.erase(buffets.begin() + x);
+                x --;
+            }
+            else{
+                ret += buffet.current;
+            }
+        }
+        return ret;
+    }
 
     void armAux(){ // Arm auxiliary mode
         if (controls.GetButton(ELBOW_CONTROL)){
@@ -673,6 +718,8 @@ public:
         mainSwerve.ApplySpeed();
         controls.update();
     }
+    
+    double tranJitter = 0;
 
 	void SynchronousFull(){
         vector pos = odometry.Update(navxHeading());
@@ -700,6 +747,11 @@ public:
 		translation.speedLimit(limit);
 
 		translation.setAngle(smartLoop(PI - translation.angle() + (navxHeading() * PI/180), PI * 2));
+
+        translation += DoBuffeter();
+        //tranJitter = randJitter(0.4) * 0.01 + tranJitter * 0.99;
+        //translation.setMagnitude(translation.magnitude() * tranJitter);
+        rotation.setMandA(rotation.magnitude() * randJitter(0.4), rotation.angle() * randJitter(0.4));
 
 		if (controls.GetButtonReleased(ZERO_NAVX)){
 			zeroNavx();
