@@ -124,8 +124,7 @@ public:
     std::vector<ArmPosition> stack;
     vector goalPos;
     ArmInfo info;
-    bool retract = false;
-    bool sweeping = false;
+    short gigaPickupState = 0;
     frc::DigitalInput elbowLimitSwitch { elbowLimitswitchID };
     frc::DigitalInput shoulderLimitSwitch { shoulderLimitswitchID };
     frc::AnalogInput elbowEncoder { elbowID };
@@ -139,7 +138,7 @@ public:
         hand = h;
         elbowController = new PIDController(e);
         elbowController -> constants.P = 0.01; // THIS IS THE GOOD ONE
-        elbowController -> constants.P = 0.007; // REMOVE THIS
+        elbowController -> constants.P = 0.003; // REMOVE THIS
         //elbowController -> constants.D = 0.00003;
         //elbowController -> constants.I = 0.0001;
         //elbowController -> constants.iZone = 45;
@@ -158,7 +157,7 @@ public:
         //shoulderController -> constants.TMax = 1.1;
         //shoulderController -> constants.D = 0.04;
         //shoulderController -> constants.F = 0.15;
-        shoulderController -> constants.MinOutput = -0.5;
+        shoulderController -> constants.MinOutput = -0.3;
         shoulderController -> constants.MaxOutput = 0.5;
         elbowController -> SetCircumference(4096);
         shoulderController -> SetCircumference(4096);
@@ -208,6 +207,35 @@ public:
             armGoToPos({70, -10});
         }
     }
+    double gigaX = 0;
+    bool giga = false;
+    bool gigaPickup() {
+        giga = true;
+        SetGrab(INTAKE);
+        if (gigaPickupState == 0) {
+            gigaPickupState = 1;
+            goToHome();
+        }
+
+        if (gigaPickupState == 1) {
+            armGoToPos({65 + gigaX, -10});
+            if (atY(-10)) {
+                gigaX += .06;
+            }
+            if (curPos.x > 120) {
+                gigaPickupState = 2;
+            }
+        }
+        else if (gigaPickupState == 2) {
+            goToHome();
+            if (curPos.x < 40) {
+                gigaPickupState = 0;
+                gigaX = 0;
+                return true;
+            }
+        }
+        return false;
+    }
 
     void goToLowPole(bool high = false) {
         armGoToPos({lowPole});
@@ -233,11 +261,11 @@ public:
     }
 
     void armGoToPos(vector pos) {
-        const int highBound = 67;
+        const int highBound = 50;
         const int lowBound = 35;
         goalPos = pos;
 
-        /*if (curPos.y < 1){
+        if (curPos.y < 1){
             if ((curPos.x >= highBound) && (pos.x <= highBound)){
                 goalPos.y = 5;
                 goalPos.x = highBound + 5;
@@ -253,7 +281,7 @@ public:
                 }
             }
             goalPos.y = 5;
-        }*/
+        }
     }
 
     int GetNormalizedShoulder(){
@@ -305,9 +333,6 @@ public:
     }
 
     double setX = 35;
-    void setRetract(bool s = true) {
-        retract = s;
-    }
 
     void armPickup(bool triggerSol = true) {
         goToPickup();
@@ -319,7 +344,7 @@ public:
                 }
             }
             else {
-                armGoToPos({setX, -10});
+                armGoToPos({setX, -10};
                 hand -> SetPercent(.35);
                 setX += .005;
                 if (Has() || setX > 150) {
@@ -333,13 +358,13 @@ public:
 
     bool atGoal(vector goal){
         vector current = GetArmPosition();
-        return withinDeadband(current.x, 15, goal.x) && withinDeadband(current.y, 15, goal.y);
+        return withinDeadband(current.x, 5, goal.x) && withinDeadband(current.y, 5, goal.y);
         //return (std::abs(shoulderEncoder.GetValue() - sAng) < 40) && (std::abs(elbowEncoder.GetValue() - eAng) < 40);
     }
 
     bool atY(double val) {
-        double curr = GetArmPosition().y;
-        return withinDeadband(curr, 7, val);
+        //double curr = GetArmPosition().y;
+        return withinDeadband(curPos.y, 3, val);
     }
 
     bool zeroed = false;
@@ -347,7 +372,12 @@ public:
     vector lastPos;
 
     void Update(){
-        elbowController -> constants.F = cos(GetElbowPos() * PI/180) * -0.2; // REMOVE THIS
+        if (!giga){
+            gigaX = 0;
+        }
+        giga = false;
+        elbowController -> constants.F = cos(GetElbowPos() * PI/180) * -0.27; // REMOVE THIS
+        elbowController -> constants.MaxOutput = std::abs(sin(GetElbowPos() * PI/180)) * 0.2; // I have a theory.
         shoulderController -> highSwitch = shoulderLimitSwitch.Get();
         elbowController -> highSwitch = elbowLimitSwitch.Get();
         if (!disabled) {
@@ -369,6 +399,8 @@ public:
                 hand -> SetPercent(-0.05);
             }
         }
+        frc::SmartDashboard::PutNumber("giga pickup", gigaPickupState);
+
         grabMode = OFF; // ain't sticky - don't want breakies
         shoulderWatcher -> Update();
         elbowWatcher -> Update();
@@ -423,6 +455,7 @@ public:
         else {
             AuxSetPercent(0, 0);
         }
+        //gigaPickupState = 0;
     }
 
     void ShimZero(){
