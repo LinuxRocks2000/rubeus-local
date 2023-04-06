@@ -733,7 +733,7 @@ public:
             #ifdef SHIM_MODE
             arm.ShimZero();
             #else
-            arm.Zero();
+            arm.zeroed = !arm.zeroed;
             #endif
         }
         //arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
