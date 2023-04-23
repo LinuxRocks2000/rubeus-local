@@ -24,7 +24,7 @@
 
 #include "controls.hpp"
 #include "Positionizer.hpp"
-#include "robot-http/robothttp.hpp" // what error? you might need to update your build.gradle against master or something
+//#include "robot-http/robothttp.hpp" // what error? you might need to update your build.gradle against master or something
 //#include "apriltags.h"
 
 #include <frc/DigitalOutput.h>
@@ -49,7 +49,7 @@ bool squared = true;
 std::vector <std::string> autoCommand;
 
 const std::string staticDir = "/home/lvuser/robot-site/";
-
+/*
 void onRequest(Request* req){
 	std::cout << req -> url << std::endl;
     if (req -> url == "/api/postRobotCommands"){
@@ -87,7 +87,7 @@ void onRequest(Request* req){
     }
 	req -> response -> send();
 }
-
+*/
 long navxHeading(){
 	return smartLoop(navx.GetFusedHeading() - navxOffset, 360);
 }
@@ -1371,20 +1371,20 @@ class DisabledMode : public RobotMode {
 
 };
 
-
+/*
 void servThread(){
     Server httpserver (5805, onRequest);
     while (true){
         httpserver.Iterate();
         usleep(1000); // Millisecond pause - this will make the server slower, but will also surrender a significant amount of time to the kernel for processing other more important threads.
     }
-}
+}*/
 
 #ifndef RUNNING_FRC_TESTS // I'm afraid to remove this.
 int main() {
     //frc::CameraServer::StartAutomaticCapture();
-    std::thread server(servThread);
-    server.detach();
+    //std::thread server(servThread);
+    //server.detach();
     compressor.Disable();
 	mainSwerve.Link(&backRightSwerve); // Weird, right? This can in fact be used here.
 	backRightSwerve.Link(&frontLeftSwerve);
