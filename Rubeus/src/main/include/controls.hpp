@@ -99,18 +99,18 @@ public:
         }
         if (buttonboard.IsConnected()) {
             usedAxis[SPEED_LIMIT] = (buttonboard.GetRawAxis(0) + 1) / 2;                // This one is flipped
-            usedButtonStates[KEY] = buttonboard.GetRawButton(7);
-            usedButtonStates[TOGGLE_OPTION_1] = buttonboard.GetRawButton(10);
-            usedButtonStates[TOGGLE_OPTION_3] = buttonboard.GetRawButton(6);
-            usedButtonStates[ARM_PICKUP_POS] = buttonboard.GetRawButton(3);
-            usedButtonStates[ZERO] = buttonboard.GetRawButton(13);
+            usedButtonStates[KEY] = buttonboard.GetRawButton(5);
+            usedButtonStates[TOGGLE_OPTION_1] = buttonboard.GetRawButton(8);
+            usedButtonStates[TOGGLE_OPTION_3] = buttonboard.GetRawButton(4);
+            usedButtonStates[ARM_PICKUP_POS] = buttonboard.GetRawButton(1);
+            usedButtonStates[ZERO] = buttonboard.GetRawButton(11);
             //usedAxis[ARM_TRIM] = buttonboard.GetRawAxis(2);
-            usedButtonStates[STOP_ARM] = buttonboard.GetRawButton(8);
-            usedButtonStates[SQUARE_UP] |= buttonboard.GetRawButton(9);
-            usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(4);
-            usedButtonStates[ARM_INTAKE_POS] = buttonboard.GetRawButton(5);
-            usedButtonStates[PICKUP_MACRO] = buttonboard.GetRawButton(12);
-            usedButtonStates[HIGH_POLE] = buttonboard.GetRawButton(11);
+            usedButtonStates[STOP_ARM] = buttonboard.GetRawButton(6);
+            usedButtonStates[SQUARE_UP] |= buttonboard.GetRawButton(7);
+            usedButtonStates[ARM_BARF] = buttonboard.GetRawButton(2);
+            usedButtonStates[ARM_INTAKE_POS] = buttonboard.GetRawButton(3);
+            usedButtonStates[PICKUP_MACRO] = buttonboard.GetRawButton(10);
+            usedButtonStates[HIGH_POLE] = buttonboard.GetRawButton(9);
         }
     }
 

@@ -20,6 +20,7 @@
 #include <FRL/util/vector.hpp>
 #include <cameraserver/CameraServer.h>
 #include <FRL/util/functions.hpp>
+#include <FRL/util/timer.hpp>
 
 #include "controls.hpp"
 #include "Positionizer.hpp"
@@ -28,6 +29,7 @@
 
 #include <frc/DigitalOutput.h>
 #include <objects.hpp>
+#define TRAINING_WHEELS // For people who aren't allowed to drive fast or use dangerous things
 
 //#define SHIM_MODE
 
@@ -184,6 +186,8 @@ long current;
 
 int approachAngleOverRamp = -1;
 
+Timer rampTimer;
+
 bool goOverRamp() {
     if (approachAngleOverRamp == -1) {
         approachAngleOverRamp = navxHeading();
@@ -206,12 +210,13 @@ bool goOverRamp() {
     else if (state == 3) {
         if (withinDeadband(getRoll(), 1, 0)) {
             state = 4;
-            current = (double)frc::Timer::GetFPGATimestamp();
+            rampTimer.start();
         }
         translation.setMagnitude(0.35);//mainSwerve.SetPercent(.35);
     }
     else {
-        if (!(current + 1 <= (double)frc::Timer::GetFPGATimestamp())) {
+        rampTimer.elapse();
+        if (rampTimer.get() < 1000) {
             translation.setMagnitude(0.2);//mainSwerve.SetPercent(.2);
         }
         else {
@@ -289,14 +294,14 @@ bool autoRamp() {
         }
     }
     else {
-        if (withinDeadband(getRoll(), 3, 0)) {
+        if (withinDeadband(getRoll(), 5, 0)) {
             mainSwerve.SetPercent(0);
             mainSwerve.Lock();
             autoRampStartingOrientation = -1;
             return true;
         }
         else {
-            tran.setMagnitude(std::abs(getRoll()) * .008);
+            tran.setMagnitude(std::abs(getRoll()) * .006);
         }
     }
     tran.setAngle(3 * PI/2);
@@ -684,15 +689,24 @@ public:
 		rotation.setMandA(controls.RightX(), PI/4);
 
 		float limit = controls.GetSpeedLimit();
+        #ifndef TRAINING_WHEELS
         if (controls.GetButton(ZOOM_ZOOM)){
             limit = 1;
         }
         if (controls.GetButton(MOOZ_MOOZ)) {       // slow-down button, as requested
             limit = .3;
         }
+        #endif
+        #ifdef TRAINING_WHEELS
+        limit *= 0.5;
+        #endif
 		frc::SmartDashboard::PutNumber("Speed limit", limit);
 
+        #ifdef TRAINING_WHEELS
+        squared = true;
+        #else
         squared = !controls.GetButton(SQUARE_UP);
+        #endif
 		rotation.dead(0.15);
 		translation.dead(0.12);
 
@@ -737,7 +751,9 @@ public:
             #endif
         }
         //arm.checkSwitches(); // call this as many times as you want. you wont get hurt and it makes it harder to break the arm
+        #ifndef TRAINING_WHEELS
         arm.SetShimTrim(controls.GetTrim() * 100);
+        #endif
 		if (controls.GetButton(ELBOW_CONTROL)){
             arm.AuxSetPercent(0, controls.LeftY());
         }
@@ -760,7 +776,7 @@ public:
                 #ifdef SHIM_MODE
                 arm.ShimPickup();
                 #else
-                arm.gigaPickup();
+                arm.goToPickup();
                 #endif
                 //arm.SetShimTrim(0);
             }
@@ -768,13 +784,15 @@ public:
                 #ifdef SHIM_MODE
                 arm.ShimPickup();
                 #else
-                arm.armGoToPos({ 113, 95 });
+                arm.armGoToPos({ 113, 90 });
                 #endif
                 //arm.SetGrab(INTAKE);
             }
             else if (controls.GetButton(HIGH_POLE)) {
                 #ifndef SHIM_MODE
+                #ifndef TRAINING_WHEELS
                 arm.goToHighCone();
+                #endif
                 #endif
             }
             else if (controls.GetOption() == 1) {
@@ -1156,6 +1174,7 @@ public:
 	}
 
 	void Start() {
+        #ifndef TRAINING_WHEELS
         dynamicMacro.clear();
         for (std::string s : autoCommand){
             if (s == "place-high-cube"){
@@ -1300,6 +1319,7 @@ public:
         //compressor.EnableDigital();
         //arm.checkSwitches();
         //mainSwerve.SetLockTime(1); // Time before the swerve drive locks, in seconds
+        #endif
 	}
 
     //vector goal;
